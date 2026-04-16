@@ -573,6 +573,34 @@ body::before {
     border-color: rgba(255,255,255,0.15) !important;
     cursor: pointer;
 }
+/* V8: Battlefield drag-to-reorder */
+.hw-card[draggable="true"] { cursor: grab; }
+.hw-card[draggable="true"]:active { cursor: grabbing; }
+.hw-card.hw-dragging {
+    opacity: 0.4; transform: scale(0.95) rotate(-2deg) !important;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5) !important;
+    transition: none;
+}
+.hw-card.hw-drag-over {
+    border-color: var(--pvz-sunshine) !important;
+    box-shadow: 0 0 20px rgba(255,215,0,0.3) !important;
+    transform: translateY(-4px) !important;
+}
+.wave-header.hw-drag-over-wave {
+    border-color: var(--pvz-sunshine) !important;
+    background: linear-gradient(135deg, rgba(255,215,0,0.2), rgba(255,215,0,0.08)) !important;
+    box-shadow: 0 0 15px rgba(255,215,0,0.2);
+}
+/* Dirt loosening particles on drag */
+.dirt-particle {
+    position: fixed; width: 6px; height: 6px; border-radius: 50%;
+    pointer-events: none; z-index: 9000;
+    animation: dirtFall 0.8s ease-out forwards;
+}
+@keyframes dirtFall {
+    0% { opacity: 1; transform: scale(1) translateY(0); }
+    100% { opacity: 0; transform: scale(0.3) translateY(30px) translateX(var(--dx, 10px)); }
+}
 /* ==================== V6.1 PVZ IMMERSIVE CSS ==================== */
 /* 1. Plant breathe animation */
 @keyframes pvzBreathe {
@@ -667,7 +695,7 @@ body::before {
 .modal-box .modal-title, .start-btn, #startScreen h1 {
     text-shadow: 2px 2px 0px #000;
 }
-/* 7. Emergency freeze button — ice pea style */
+/* 7. Emergency freeze button — ice pea style with rotating ice crystal */
 .btn-emergency-freeze {
     background: linear-gradient(135deg, #4fc3f7, #0288d1);
     color: #fff; border: 3px solid rgba(79,195,247,0.6);
@@ -676,17 +704,54 @@ body::before {
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 0 20px rgba(79,195,247,0.4), 0 4px 14px rgba(0,0,0,0.3);
     position: relative; overflow: hidden;
+    animation: iceCrystalSpin 4s linear infinite;
+}
+@keyframes iceCrystalSpin {
+    0% { filter: hue-rotate(0deg) drop-shadow(0 0 8px #4fc3f7); }
+    25% { filter: hue-rotate(15deg) drop-shadow(0 0 14px #81d4fa); }
+    50% { filter: hue-rotate(0deg) drop-shadow(0 0 20px #4fc3f7); }
+    75% { filter: hue-rotate(-15deg) drop-shadow(0 0 14px #0288d1); }
+    100% { filter: hue-rotate(0deg) drop-shadow(0 0 8px #4fc3f7); }
 }
 .btn-emergency-freeze::before {
-    content: ''; position: absolute; width: 100%; height: 100%;
-    background: radial-gradient(circle, rgba(255,255,255,0.3) 0%, transparent 70%);
-    animation: iceShimmer 2s ease infinite;
+    content: ''; position: absolute; width: 120%; height: 120%;
+    background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.25) 25%, transparent 50%, rgba(129,212,250,0.3) 75%, transparent 100%);
+    animation: iceShimmerRotate 3s linear infinite;
+    border-radius: 50%;
 }
-@keyframes iceShimmer { 0%,100%{opacity:0.3;transform:scale(0.8);} 50%{opacity:0.8;transform:scale(1.2);} }
+@keyframes iceShimmerRotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.btn-emergency-freeze::after {
+    content: '❄️'; position: absolute; font-size: 0.5em;
+    animation: iceFlakeOrbit 2.5s linear infinite;
+    pointer-events: none;
+}
+@keyframes iceFlakeOrbit {
+    0% { transform: rotate(0deg) translateX(22px) rotate(0deg); opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { transform: rotate(360deg) translateX(22px) rotate(-360deg); opacity: 0.7; }
+}
 .btn-emergency-freeze:hover {
     transform: scale(1.15); box-shadow: 0 0 35px rgba(79,195,247,0.7), 0 8px 24px rgba(0,0,0,0.4);
+    animation: iceCrystalSpin 2s linear infinite;
 }
-.btn-emergency-freeze:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; }
+.btn-emergency-freeze:disabled { opacity: 0.3; cursor: not-allowed; transform: none !important; animation: none; }
+/* Freeze duration picker */
+.freeze-picker {
+    position: absolute; top: 100%; right: 0; margin-top: 8px;
+    background: linear-gradient(135deg, rgba(2,136,209,0.95), rgba(79,195,247,0.9));
+    border-radius: 16px; padding: 10px; display: flex; gap: 6px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.4); border: 2px solid rgba(129,212,250,0.5);
+    z-index: 100; white-space: nowrap;
+}
+.freeze-picker button {
+    padding: 8px 14px; border: 2px solid rgba(255,255,255,0.3); border-radius: 12px;
+    background: rgba(0,0,0,0.2); color: #fff; font-weight: bold; font-size: 0.85em;
+    cursor: pointer; transition: all 0.2s;
+}
+.freeze-picker button:hover { background: rgba(255,255,255,0.2); border-color: #fff; transform: scale(1.05); }
 /* 8. Golden glow for max-stage plants */
 .garden-slot.stage-2 .plant-icon {
     filter: drop-shadow(0 0 15px gold) !important;
@@ -806,7 +871,15 @@ body::before {
     <div class="main-panel">
         <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
             <span>🧠 保卫脑子战场 — 消灭僵尸！</span>
-            <button class="btn-emergency-freeze" id="emergencyFreezeBtn" onclick="activateEmergencyFreeze()" title="冰冻豆救援 — 暂停所有作业计时">❄️</button>
+            <div style="position:relative;">
+                <button class="btn-emergency-freeze" id="emergencyFreezeBtn" onclick="showFreezePicker()" title="冰冻豆救援 — 暂停所有作业计时">❄️</button>
+                <div class="freeze-picker hidden" id="freezePicker">
+                    <button onclick="activateEmergencyFreeze(60)">1分</button>
+                    <button onclick="activateEmergencyFreeze(180)">3分</button>
+                    <button onclick="activateEmergencyFreeze(300)">5分</button>
+                    <button onclick="activateEmergencyFreeze(600)">10分</button>
+                </div>
+            </div>
         </div>
         <div class="homework-input-area">
             <textarea id="homeworkInput" placeholder="粘贴今日作业文本...&#10;例如：&#10;语文：抄写第3课生字 p.15（必做）&#10;数学：练习册第20页（必做）&#10;英语：听读Unit3（二选一）&#10;英语：抄写单词表（二选一）"></textarea>
@@ -1822,12 +1895,25 @@ function completeShieldRepair() {
 
 // ==================== EMERGENCY_FREEZE ====================
 let freezeInterval = null;
-function activateEmergencyFreeze() {
+function showFreezePicker() {
     if (gameState.character.frozenUntil && gameState.character.frozenUntil > Date.now()) {
         showToast('冰冻豆已经在工作了，指挥官请耐心等待！');
         return;
     }
-    gameState.character.frozenUntil = Date.now() + 180 * 1000; // 180 seconds
+    const picker = document.getElementById('freezePicker');
+    picker.classList.toggle('hidden');
+    // Auto-hide on outside click
+    const hide = (e) => { if (!e.target.closest('#freezePicker') && !e.target.closest('#emergencyFreezeBtn')) { picker.classList.add('hidden'); document.removeEventListener('click', hide); } };
+    setTimeout(() => document.addEventListener('click', hide), 10);
+}
+function activateEmergencyFreeze(seconds) {
+    document.getElementById('freezePicker').classList.add('hidden');
+    if (gameState.character.frozenUntil && gameState.character.frozenUntil > Date.now()) {
+        showToast('冰冻豆已经在工作了，指挥官请耐心等待！');
+        return;
+    }
+    const duration = seconds || 180;
+    gameState.character.frozenUntil = Date.now() + duration * 1000;
     saveGame();
     showFreezeOverlay();
     audioQueue.playSFX('waveAlarm');
@@ -2275,9 +2361,10 @@ function renderBattlefield() {
         const waveNames = ['第一波 — 前锋僵尸', '第二波 — 路障僵尸', '第三波 — BOSS 巨人僵尸'];
         const waveIcons = ['🧟', '🧟‍♂️', '👹'];
         const doneCount = waveItems.filter(h => h.status === 'completed').length;
-        html += '<div class="wave-header ' + (cleared ? 'cleared' : '') + '">';
+        html += '<div class="wave-header ' + (cleared ? 'cleared' : '') + '" data-wave="' + w + '" ondragover="hwWaveDragOver(event)" ondrop="hwWaveDrop(event,' + w + ')" ondragleave="hwWaveDragLeave(event)">';
         html += '<h3>' + waveIcons[w-1] + ' ' + waveNames[w-1] + '</h3>';
-        html += '<span class="wave-status">' + doneCount + '/' + waveItems.length + (cleared ? ' ✅' : '') + '</span></div>';
+        html += '<span class="wave-status">' + doneCount + '/' + waveItems.length + (cleared ? ' ✅' : '') + '</span>';
+        html += '<span style="font-size:0.7em;color:rgba(255,255,255,0.3);margin-left:8px;">拖拽卡片到此波次</span></div>';
         // Check for optional pairs in this wave
         const renderedIds = new Set();
         html += '<div class="homework-grid">';
@@ -2308,7 +2395,8 @@ function renderBattlefield() {
 function renderHwCard(hw, isDisciplineViolation, isChoice) {
     const done = hw.status === 'completed';
     const bossStyle = hw.wave === 3 ? 'border-color:rgba(220,53,69,0.4);' : '';
-    let html = '<div class="hw-card ' + (done ? 'completed undo-pending' : '') + (isChoice ? ' choice-highlight' : '') + '" data-hw-id="' + hw.id + '" style="' + bossStyle + 'display:flex;align-items:stretch;">';
+    const dragAttr = !done ? ' draggable="true" ondragstart="hwDragStart(event,\'' + hw.id + '\')" ondragend="hwDragEnd(event)"' : '';
+    let html = '<div class="hw-card ' + (done ? 'completed undo-pending' : '') + (isChoice ? ' choice-highlight' : '') + '" data-hw-id="' + hw.id + '" data-hw-wave="' + hw.wave + '" style="' + bossStyle + 'display:flex;align-items:stretch;"' + dragAttr + ' ondragover="hwDragOver(event)" ondrop="hwDrop(event,\'' + hw.id + '\')" ondragleave="hwDragLeave(event)">';
     // V8: Delete button
     if (!done) html += '<button class="btn-delete-hw" onclick="event.stopPropagation();deleteHomework(\'' + hw.id + '\')" title="删除此作业">×</button>';
     html += '<div style="flex:1;">';
@@ -3475,6 +3563,97 @@ function undoHomework(hwId) {
     saveGame(); renderBattlefield();
     showToast('已撤销完成: ' + hw.description);
 }
+// V8: Battlefield drag-to-reorder — native drag & drop with dirt particles
+let _hwDragId = null;
+function hwDragStart(e, hwId) {
+    _hwDragId = hwId;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', hwId);
+    const card = e.target.closest('.hw-card');
+    if (card) {
+        setTimeout(() => card.classList.add('hw-dragging'), 0);
+        // Dirt loosening particles
+        showDirtParticles(card);
+    }
+}
+function hwDragEnd(e) {
+    _hwDragId = null;
+    document.querySelectorAll('.hw-dragging').forEach(el => el.classList.remove('hw-dragging'));
+    document.querySelectorAll('.hw-drag-over').forEach(el => el.classList.remove('hw-drag-over'));
+    document.querySelectorAll('.hw-drag-over-wave').forEach(el => el.classList.remove('hw-drag-over-wave'));
+}
+function hwDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const card = e.target.closest('.hw-card');
+    if (card && card.dataset.hwId !== _hwDragId) card.classList.add('hw-drag-over');
+}
+function hwDragLeave(e) {
+    const card = e.target.closest('.hw-card');
+    if (card) card.classList.remove('hw-drag-over');
+}
+function hwDrop(e, targetHwId) {
+    e.preventDefault();
+    const sourceId = _hwDragId || e.dataTransfer.getData('text/plain');
+    if (!sourceId || sourceId === targetHwId) return;
+    const parsed = gameState.homework.parsed;
+    const srcIdx = parsed.findIndex(h => h.id === sourceId);
+    const tgtIdx = parsed.findIndex(h => h.id === targetHwId);
+    if (srcIdx < 0 || tgtIdx < 0) return;
+    // Move source to target's wave
+    parsed[srcIdx].wave = parsed[tgtIdx].wave;
+    // Reorder: remove source and insert at target position
+    const [moved] = parsed.splice(srcIdx, 1);
+    const newTgtIdx = parsed.findIndex(h => h.id === targetHwId);
+    parsed.splice(newTgtIdx, 0, moved);
+    saveGame(); renderBattlefield();
+    showToast('战术调整完成！');
+    audioQueue.playSFX('click');
+}
+function hwWaveDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const header = e.target.closest('.wave-header');
+    if (header) header.classList.add('hw-drag-over-wave');
+}
+function hwWaveDragLeave(e) {
+    const header = e.target.closest('.wave-header');
+    if (header) header.classList.remove('hw-drag-over-wave');
+}
+function hwWaveDrop(e, targetWave) {
+    e.preventDefault();
+    const sourceId = _hwDragId || e.dataTransfer.getData('text/plain');
+    if (!sourceId) return;
+    const hw = gameState.homework.parsed.find(h => h.id === sourceId);
+    if (!hw) return;
+    if (hw.wave === targetWave) { showToast('已经在这个波次了'); return; }
+    const oldWave = hw.wave;
+    hw.wave = targetWave;
+    // Adjust sunshine reward based on new wave
+    hw.sunshineReward = targetWave === 1 ? 30 : targetWave === 2 ? 50 : 80;
+    saveGame(); renderBattlefield();
+    const waveNames = ['前锋僵尸', '路障僵尸', 'BOSS巨人僵尸'];
+    showToast('「' + hw.description + '」移至第' + targetWave + '波 ' + waveNames[targetWave - 1]);
+    audioQueue.playSFX('click');
+}
+function showDirtParticles(el) {
+    const rect = el.getBoundingClientRect();
+    const colors = ['#8B4513', '#a0522d', '#5c3317', '#d2691e', '#6b3a1f'];
+    for (let i = 0; i < 8; i++) {
+        setTimeout(() => {
+            const p = document.createElement('div');
+            p.className = 'dirt-particle';
+            p.style.left = (rect.left + Math.random() * rect.width) + 'px';
+            p.style.top = (rect.bottom - 5) + 'px';
+            p.style.background = colors[Math.floor(Math.random() * colors.length)];
+            p.style.setProperty('--dx', (Math.random() * 30 - 15) + 'px');
+            p.style.width = (4 + Math.random() * 4) + 'px';
+            p.style.height = p.style.width;
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 1000);
+        }, i * 40);
+    }
+}
 function completeRoutine(taskId) {
     const task = gameState.routines.tasks.find(t => t.id === taskId);
     if (!task || task.completed) return;
@@ -3567,10 +3746,13 @@ function showModal(icon, title, desc, buttons) {
 function closeModal() { document.getElementById('gameModal').classList.remove('show'); }
 
 // ==================== AZURE_TTS ====================
+const STITCH_PREFIXES = ['阿罗哈！','哦呼！','叽里咕噜...','嘿嘿嘿！','咕噜咕噜~','哦哈纳！','叽叽叽~'];
+const STITCH_QUESTION_TAILS = ['...嗯？','...哦？','...叽？','...咕噜？'];
 const VOICE_STYLES = {
     stitch: {
         label: '史迪奇 (鼻音/调皮)',
         pitch: '+50%', rate: '1.1',
+        contour: '(0%,+30%) (30%,+60%) (60%,+40%) (80%,+55%) (100%,+30%)',
         voiceName: 'zh-CN-XiaoxiaoNeural',
         style: 'cheerful',
         broadcasts: [
@@ -3640,18 +3822,20 @@ class AzureTTS {
             const config = this.getStyleConfig();
             const voiceName = config.voiceName;
             const escapedText = text.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
-            // Build SSML with prosody for pitch/rate and optional express-as style
+            // Build SSML — stitch style gets contour for playful intonation
             let ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="zh-CN">';
             ssml += '<voice name="' + voiceName + '">';
-            if (config.style) {
-                ssml += '<mstts:express-as style="' + config.style + '">';
-            }
-            ssml += '<prosody pitch="' + config.pitch + '" rate="' + config.rate + '">';
+            if (config.style) ssml += '<mstts:express-as style="' + config.style + '">';
+            ssml += '<prosody pitch="' + config.pitch + '" rate="' + config.rate + '"';
+            if (config.contour) ssml += ' contour="' + config.contour + '"';
+            ssml += '>';
             ssml += escapedText;
             ssml += '</prosody>';
-            if (config.style) {
-                ssml += '</mstts:express-as>';
+            // Stitch "question tone" tail — rising pitch pause to hint listening window is open
+            if ((gameState.voice.voiceStyle || 'stitch') === 'stitch') {
+                ssml += '<break time="400ms"/><prosody pitch="+80%" rate="1.3" contour="(0%,+20%) (100%,+90%)">嗯？</prosody>';
             }
+            if (config.style) ssml += '</mstts:express-as>';
             ssml += '</voice></speak>';
             const resp = await fetch('https://' + region + '.tts.speech.microsoft.com/cognitiveservices/v1', {
                 method: 'POST',
@@ -3675,13 +3859,25 @@ class AzureTTS {
     speakFallback(text) {
         if (!('speechSynthesis' in window)) return false;
         const config = this.getStyleConfig();
-        const utter = new SpeechSynthesisUtterance(text);
+        const isStitch = (gameState.voice.voiceStyle || 'stitch') === 'stitch';
+        // Stitch fallback: forced high pitch + random prefix + question tail
+        let finalText = text;
+        if (isStitch) {
+            const prefix = STITCH_PREFIXES[Math.floor(Math.random() * STITCH_PREFIXES.length)];
+            const tail = STITCH_QUESTION_TAILS[Math.floor(Math.random() * STITCH_QUESTION_TAILS.length)];
+            finalText = prefix + text + tail;
+        }
+        const utter = new SpeechSynthesisUtterance(finalText);
         utter.lang = 'zh-CN';
-        // Map style pitch string to numeric: "+50%" -> 1.5, "-10%" -> 0.9
-        const pitchStr = config.pitch || '+0%';
-        const pitchPct = parseInt(pitchStr.replace('%', '')) || 0;
-        utter.pitch = Math.max(0.1, Math.min(2, 1 + pitchPct / 100));
-        utter.rate = parseFloat(config.rate) || 1;
+        if (isStitch) {
+            utter.pitch = 1.6;
+            utter.rate = 1.1;
+        } else {
+            const pitchStr = config.pitch || '+0%';
+            const pitchPct = parseInt(pitchStr.replace('%', '')) || 0;
+            utter.pitch = Math.max(0.1, Math.min(2, 1 + pitchPct / 100));
+            utter.rate = parseFloat(config.rate) || 1;
+        }
         utter.volume = gameState.voice.reminderVolume || 0.8;
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utter);
