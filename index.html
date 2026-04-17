@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PVZ Quest V8 - 小树植物大战僵尸教育系统</title>
+<title>PVZ Quest V9 - 小树植物大战僵尸教育系统</title>
 <style>
 /* ==================== CSS_RESET ==================== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -91,14 +91,25 @@ body::before {
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 .wave-header {
-    display: flex; align-items: center; gap: 15px; margin: 22px 0 14px;
-    padding: 14px 22px; border-radius: 18px;
+    display: flex; align-items: center; gap: 15px; margin: 22px 0 0;
+    padding: 14px 22px 10px; border-radius: 18px 18px 0 0;
     background: linear-gradient(135deg, rgba(107,63,160,0.35), rgba(107,63,160,0.15));
-    border-left: 5px solid var(--pvz-zombie);
+    border-left: 5px solid var(--pvz-zombie); flex-wrap: wrap;
 }
 .wave-header h3 { font-size: 1.2em; }
 .wave-header .wave-status { margin-left: auto; font-size: 1em; color: rgba(255,255,255,0.6); font-weight: bold; }
 .wave-header.cleared { border-left-color: var(--pvz-green-light); background: linear-gradient(135deg, rgba(74,124,46,0.2), rgba(74,124,46,0.08)); }
+.wave-progress-wrap {
+    width: 100%; height: 10px; background: rgba(0,0,0,0.3); border-radius: 5px;
+    overflow: hidden; margin-top: 6px;
+}
+.wave-progress-bar {
+    height: 100%; border-radius: 5px; transition: width 0.6s ease;
+    background: linear-gradient(90deg, var(--pvz-zombie), #ba68c8);
+}
+.wave-header.cleared .wave-progress-bar {
+    background: linear-gradient(90deg, var(--pvz-green), var(--pvz-green-light));
+}
 .homework-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
 .hw-card {
     background: var(--card-bg); border-radius: 22px; padding: 20px;
@@ -115,6 +126,8 @@ body::before {
 .subject-yingyu { background: rgba(255,183,77,0.25); color: #ffc97d; }
 .subject-kexue { background: rgba(129,199,132,0.25); color: #a5d6a7; }
 .subject-daofa { background: rgba(186,104,200,0.25); color: #ce93d8; }
+.subject-yishu { background: rgba(255,183,77,0.25); color: #ffcc80; }
+.subject-tiyu { background: rgba(76,175,80,0.25); color: #81c784; }
 .subject-default { background: rgba(255,255,255,0.12); color: #ddd; }
 .hw-card .hw-desc { font-size: 1.15em; margin-bottom: 14px; line-height: 1.7; font-weight: bold; color: #f0f0f0; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 .hw-card .hw-meta { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
@@ -859,7 +872,7 @@ body::before {
 <body>
 
 <div id="startScreen">
-    <h1>PVZ Quest V8</h1>
+    <h1>PVZ Quest V9</h1>
     <p class="subtitle">植物大战僵尸 x 教育系统<br>保卫脑子战场 | 基地能量补给 | 成长花园 | 戴夫秘密金库</p>
     <button class="start-btn" onclick="startApp()">开始战斗</button>
     <p style="color:#555;margin-top:30px;font-size:0.9em;">点击"开始战斗"激活所有功能</p>
@@ -1013,7 +1026,7 @@ body::before {
     </div>
 </div>
 <div style="text-align:center;padding:20px 0 10px;opacity:0.3;font-size:0.75em;">
-    <span style="cursor:pointer;" onclick="openDaveLab()" title="家长管理">PVZ Quest V8 | 🔬</span>
+    <span style="cursor:pointer;" onclick="openDaveLab()" title="家长管理">PVZ Quest V9 | 🔬</span>
 </div>
 </div> <!-- end .container -->
 <div id="reminderPopup" class="reminder-popup" style="display:none;">
@@ -1061,9 +1074,10 @@ body::before {
 <script>
 // ==================== DATA_MODEL ====================
 const DEFAULT_STATE = {
-    version: 8,
+    version: 9,
+    schemaVersion: 9,
     lastResetDate: '',
-    homework: { rawText: '', parsed: [], currentWave: 1, waveCleared: [false, false, false], bossUnlocked: false, optionalPairs: [], optionalChoices: {} },
+    homework: { rawText: '', parsed: [], currentWave: 1, waveCleared: [], bossUnlocked: false, optionalPairs: [], optionalChoices: {} },
     routines: {
         tasks: [
             { id: 'rt_1', name: '起床冲锋号', time: '07:00', duration: 5, order: 0, icon: '🌅', fertilizerType: 'normal', fertilizerWeight: 10, coinReward: 5, completed: false, completedAt: null },
@@ -1075,7 +1089,8 @@ const DEFAULT_STATE = {
             { id: 'rt_7', name: '做作业', time: '19:00', duration: 30, order: 6, icon: '📝', fertilizerType: 'normal', fertilizerWeight: 15, coinReward: 8, completed: false, completedAt: null },
             { id: 'rt_8', name: '睡觉时间', time: '21:00', duration: 5, order: 7, icon: '😴', fertilizerType: 'normal', fertilizerWeight: 10, coinReward: 5, completed: false, completedAt: null }
         ],
-        departureDeadline: '08:00'
+        departureDeadline: '08:00',
+        compressionEnabled: true
     },
     garden: { plants: [], slots: 9 },
     economy: { sunshine: 0, coins: 0, fertilizer: { normal: 0, gold: 0 }, bank: { deposited: 0, interestRate: 0.05, lastInterestDate: null, interestShownToday: false }, sunshineEarnedToday: 0 },
@@ -1083,6 +1098,7 @@ const DEFAULT_STATE = {
     history: { dailyLogs: [], streakDays: [], totalPoints: 0, currentStreak: 0, bestStreak: 0, purchases: [] },
     achievements: { unlocked: [], xp: 0, level: 1 },
     daveLab: {
+        waveCount: 3,
         rewardWeights: { sunshineBase: 50, sunshineVariance: 0.2, fertilizerMultiplier: 1.0, coinMultiplier: 1.0 },
         priceControl: { inflationCap: 500, deflationFloor: 10 },
         emergencyBounty: false, hiddenEntryCode: '4399',
@@ -1094,6 +1110,7 @@ const DEFAULT_STATE = {
         ],
         plantPriceOverrides: {},
         adHocReminders: [],
+        pendingReminders: [],
         githubGistId: '', lastSyncTime: null, autoSync: false
     },
     voice: {
@@ -1215,12 +1232,10 @@ const DAVE_LINES = {
 // ==================== PERSISTENCE ====================
 function saveGame() {
     try {
-        // V8: Never persist token or Azure key in gameState
         const clone = JSON.parse(JSON.stringify(gameState));
         delete clone.daveLab.githubGistToken;
         delete clone.voice.azureApiKey;
-        localStorage.setItem('xiaoshuPVZv8', JSON.stringify(clone));
-        // V8: Auto-sync push
+        localStorage.setItem('xiaoshuPVZ', JSON.stringify(clone));
         autoSyncPush();
     } catch(e) { console.error('保存失败:', e); }
 }
@@ -1232,66 +1247,84 @@ function getAzureKey() { return localStorage.getItem('xiaoshuAzureKey') || ''; }
 function setAzureKey(key) { localStorage.setItem('xiaoshuAzureKey', key); }
 function loadGame() {
     try {
-        let saved = localStorage.getItem('xiaoshuPVZv8');
+        let saved = localStorage.getItem('xiaoshuPVZ');
+        let needsKeyMigration = false;
         if (!saved) {
-            saved = localStorage.getItem('xiaoshuPVZv7');
-            if (!saved) {
-                saved = localStorage.getItem('xiaoshuPVZv6');
-                if (!saved) {
-                    saved = localStorage.getItem('xiaoshuPVZv5');
-                    if (!saved) { migrateFromV3(); return; }
-                }
+            const oldKeys = ['xiaoshuPVZv8','xiaoshuPVZv7','xiaoshuPVZv6','xiaoshuPVZv5'];
+            for (const key of oldKeys) {
+                saved = localStorage.getItem(key);
+                if (saved) { needsKeyMigration = true; break; }
             }
-            // Migrate token out of gameState on first v8 load
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (parsed.daveLab && parsed.daveLab.githubGistToken) {
-                    setGistToken(parsed.daveLab.githubGistToken);
-                    delete parsed.daveLab.githubGistToken;
-                }
-                // Migrate Azure key out of gameState
-                if (parsed.voice && parsed.voice.azureApiKey) {
-                    setAzureKey(parsed.voice.azureApiKey);
-                    delete parsed.voice.azureApiKey;
-                }
-                saved = JSON.stringify(parsed);
-            }
+            if (!saved) { migrateFromV3(); return; }
         }
-        const parsed = JSON.parse(saved);
+        let parsed = JSON.parse(saved);
+        if (parsed.daveLab && parsed.daveLab.githubGistToken) {
+            setGistToken(parsed.daveLab.githubGistToken);
+            delete parsed.daveLab.githubGistToken;
+        }
+        if (parsed.voice && parsed.voice.azureApiKey) {
+            setAzureKey(parsed.voice.azureApiKey);
+            delete parsed.voice.azureApiKey;
+        }
+        parsed = runMigrations(parsed);
         gameState = deepMerge(JSON.parse(JSON.stringify(DEFAULT_STATE)), parsed);
-        migrateToV7();
+        if (needsKeyMigration) {
+            saveGame();
+            ['xiaoshuPVZv8','xiaoshuPVZv7','xiaoshuPVZv6','xiaoshuPVZv5'].forEach(k => localStorage.removeItem(k));
+            console.log('已迁移到统一存储 key: xiaoshuPVZ');
+        }
     } catch(e) { console.error('加载失败:', e); }
 }
-function migrateToV7() {
-    if (gameState.version >= 7) return;
-    // Migrate voice settings from daveLab
-    if (gameState.daveLab.azureApiKey) { setAzureKey(gameState.daveLab.azureApiKey); delete gameState.daveLab.azureApiKey; }
-    if (gameState.daveLab.azureRegion) { gameState.voice.azureRegion = gameState.daveLab.azureRegion; }
-    if (gameState.daveLab.useAzureTTS) { gameState.voice.useAzureTTS = gameState.daveLab.useAzureTTS; }
-    // Migrate deadline field
-    if (gameState.routines.deadline && !gameState.routines.departureDeadline) {
-        gameState.routines.departureDeadline = gameState.routines.deadline;
+const MIGRATIONS = [
+    { from: 7, to: 8, fn: migrateV7toV8 },
+    { from: 8, to: 9, fn: migrateV8toV9 }
+];
+function runMigrations(data) {
+    let ver = data.schemaVersion || data.version || 7;
+    const target = DEFAULT_STATE.schemaVersion;
+    while (ver < target) {
+        const m = MIGRATIONS.find(m => m.from === ver);
+        if (!m) break;
+        m.fn(data);
+        ver = m.to;
+        data.schemaVersion = ver;
     }
-    // Add duration/order to existing tasks
-    gameState.routines.tasks.forEach((t, i) => {
-        if (!t.duration) t.duration = 10;
-        if (t.order === undefined) t.order = i;
-    });
-    // Init new fields
-    if (!gameState.homework.optionalChoices) gameState.homework.optionalChoices = {};
-    if (!gameState.daveLab.plantPriceOverrides) gameState.daveLab.plantPriceOverrides = {};
-    if (!gameState.daveLab.adHocReminders) gameState.daveLab.adHocReminders = [];
-    if (!gameState.daveLab.githubGistToken) gameState.daveLab.githubGistToken = '';
-    if (!gameState.daveLab.githubGistId) gameState.daveLab.githubGistId = '';
-    if (!gameState.voice) gameState.voice = JSON.parse(JSON.stringify(DEFAULT_STATE.voice));
-    if (!gameState.character.meditationEnd) gameState.character.meditationEnd = null;
-    if (!gameState.character.frozenUntil) gameState.character.frozenUntil = null;
-    if (!gameState.voice.voiceStyle) gameState.voice.voiceStyle = 'stitch';
-    if (!gameState.voice.reminderMaxCount) gameState.voice.reminderMaxCount = 3;
-    if (!gameState.economy.bank.interestShownToday) gameState.economy.bank.interestShownToday = false;
-    gameState.version = 7;
-    saveGame();
-    console.log('→V7 迁移完成');
+    return data;
+}
+function migrateV7toV8(data) {
+    if (data.daveLab && data.daveLab.azureApiKey) { setAzureKey(data.daveLab.azureApiKey); delete data.daveLab.azureApiKey; }
+    if (data.daveLab && data.daveLab.azureRegion) { if (!data.voice) data.voice = {}; data.voice.azureRegion = data.daveLab.azureRegion; }
+    if (data.daveLab && data.daveLab.useAzureTTS) { if (!data.voice) data.voice = {}; data.voice.useAzureTTS = data.daveLab.useAzureTTS; }
+    if (data.routines && data.routines.deadline && !data.routines.departureDeadline) {
+        data.routines.departureDeadline = data.routines.deadline;
+    }
+    if (data.routines && data.routines.tasks) {
+        data.routines.tasks.forEach((t, i) => { if (!t.duration) t.duration = 10; if (t.order === undefined) t.order = i; });
+    }
+    if (data.homework && !data.homework.optionalChoices) data.homework.optionalChoices = {};
+    if (!data.daveLab) data.daveLab = {};
+    if (!data.daveLab.plantPriceOverrides) data.daveLab.plantPriceOverrides = {};
+    if (!data.daveLab.adHocReminders) data.daveLab.adHocReminders = [];
+    if (!data.voice) data.voice = {};
+    if (!data.voice.voiceStyle) data.voice.voiceStyle = 'stitch';
+    if (!data.voice.reminderMaxCount) data.voice.reminderMaxCount = 3;
+    if (data.economy && data.economy.bank && !data.economy.bank.interestShownToday) data.economy.bank.interestShownToday = false;
+    if (data.character && !data.character.meditationEnd) data.character.meditationEnd = null;
+    if (data.character && !data.character.frozenUntil) data.character.frozenUntil = null;
+    data.version = 8;
+    data.schemaVersion = 8;
+}
+function migrateV8toV9(data) {
+    if (!data.daveLab) data.daveLab = {};
+    if (!data.daveLab.waveCount) data.daveLab.waveCount = 3;
+    if (!data.daveLab.pendingReminders) data.daveLab.pendingReminders = [];
+    if (!data.routines) data.routines = {};
+    if (data.routines.compressionEnabled === undefined) data.routines.compressionEnabled = true;
+    if (data.homework && Array.isArray(data.homework.waveCleared) && data.homework.waveCleared.length === 3) {
+        // Keep existing wave cleared state, will be resized on next parse
+    }
+    data.version = 9;
+    data.schemaVersion = 9;
 }
 function deepMerge(target, source) {
     for (const key in source) {
@@ -1378,7 +1411,7 @@ function dailyReset() {
     gameState.economy.bank.interestShownToday = false;
     // 重置每日状态
     gameState.routines.tasks.forEach(t => { t.completed = false; t.completedAt = null; });
-    gameState.homework = { rawText: '', parsed: [], currentWave: 1, waveCleared: [false, false, false], bossUnlocked: false, optionalPairs: [] };
+    gameState.homework = { rawText: '', parsed: [], currentWave: 1, waveCleared: new Array(gameState.daveLab.waveCount || 3).fill(false), bossUnlocked: false, optionalPairs: [] };
     gameState.character.disciplineToday = null;
     gameState.character.calmMedalToday = false;
     gameState.character.brokenShield = false;
@@ -1396,9 +1429,10 @@ function dailyReset() {
 
 // ==================== PARSE_HOMEWORK ====================
 const SUBJECT_MAP = {
-    '语文': 'yuwen', '数学': 'shuxue', '英语': 'yingyu', '科学': 'kexue',
-    '道法': 'daofa', '道德': 'daofa', '音乐': 'default', '美术': 'default', '体育': 'default'
+    '语文': 'yuwen', '数学': 'shuxue', '英语': 'yingyu', '艺术': 'yishu', '体育': 'tiyu', '其他': 'default',
+    '科学': 'kexue', '道法': 'daofa', '道德': 'daofa', '音乐': 'yishu', '美术': 'yishu'
 };
+const AVAILABLE_SUBJECTS = ['语文', '数学', '英语', '艺术', '体育', '其他'];
 const SUBJECT_RE = new RegExp('(' + Object.keys(SUBJECT_MAP).join('|') + ')');
 const PAGE_RE = /[pP]\.?\s*(\d+)(?:\s*[-~]\s*(\d+))?|第\s*(\d+)\s*页/;
 const SEQ_RE = /^[\s]*(?:(\d+)[.、)）]|[（(](\d+)[)）]|第\s*(\d+)\s*题|([一二三四五六七八九十]+)[、.]|([①②③④⑤⑥⑦⑧⑨⑩]))/;
@@ -1493,24 +1527,12 @@ function parseHomeworkText(rawText) {
 }
 function assignWaves(parsed) {
     if (!parsed.length) return parsed;
-    const d1 = parsed.filter(h => h.difficulty === 1);
-    const d2 = parsed.filter(h => h.difficulty === 2);
-    const d3 = parsed.filter(h => h.difficulty === 3);
-    // 如果全部同难度，均匀分配
-    if ((d1.length === parsed.length) || (d2.length === parsed.length) || (d3.length === parsed.length)) {
-        const third = Math.ceil(parsed.length / 3);
-        parsed.forEach((h, i) => { h.wave = i < third ? 1 : i < third * 2 ? 2 : 3; });
-    } else {
-        d1.forEach(h => h.wave = 1);
-        d2.forEach(h => h.wave = 2);
-        d3.forEach(h => h.wave = 3);
-        // 确保每波至少有一个任务
-        if (d1.length === 0 && d2.length > 1) { d2[0].wave = 1; }
-        if (d3.length === 0 && d2.length > 1) { d2[d2.length - 1].wave = 3; }
-    }
-    // 根据难度调整阳光奖励
+    const waveCount = gameState.daveLab.waveCount || 3;
+    const sorted = [...parsed].sort((a, b) => a.difficulty - b.difficulty);
+    sorted.forEach((h, i) => { h.wave = (i % waveCount) + 1; });
     parsed.forEach(h => {
-        h.sunshineReward = h.difficulty === 1 ? 30 : h.difficulty === 2 ? 50 : 80;
+        const ratio = h.wave / waveCount;
+        h.sunshineReward = ratio < 0.34 ? 30 : ratio < 0.67 ? 50 : 80;
     });
     return parsed;
 }
@@ -1710,16 +1732,16 @@ function checkWaveCleared(waveNum) {
     if (waveBonus > 0) addSunshine(waveBonus);
     speakDave('waveCleared', {});
     showToast(getDaveLine('waveCleared'));
-    if (waveNum === 2 && !gameState.homework.bossUnlocked) {
+    const waveCount = gameState.daveLab.waveCount || 3;
+    if (waveNum === waveCount - 1 && !gameState.homework.bossUnlocked) {
         gameState.homework.bossUnlocked = true;
         showHugeWaveAlert();
-        // Huge wave gets special urgent TTS
         setTimeout(() => {
             speakDave('hugeWave', {});
             showToast(getDaveLine('hugeWave'));
         }, 4500);
     }
-    if (waveNum === 3) {
+    if (waveNum === waveCount) {
         setTimeout(() => speakDave('allHomeworkDone', {}), 1000);
         showToast(getDaveLine('allHomeworkDone'));
     }
@@ -2128,7 +2150,7 @@ function importGameData(event) {
             const imported = JSON.parse(e.target.result);
             if (!imported.version) { showToast('无效的备份文件'); return; }
             gameState = deepMerge(JSON.parse(JSON.stringify(DEFAULT_STATE)), imported);
-            migrateToV6();
+            runMigrations(gameState);
             saveGame(); renderAll();
             showToast('数据恢复成功！');
             closeDaveLab();
@@ -2162,7 +2184,7 @@ async function syncToGist() {
                 method: 'POST',
                 headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    description: 'PVZ Quest V8 - 小树植物大战僵尸存档',
+                    description: 'PVZ Quest V9 - 小树植物大战僵尸存档',
                     public: false,
                     files: { 'pvzquest-save.json': { content: data } }
                 })
@@ -2198,12 +2220,14 @@ async function syncFromGist() {
             if (!confirm('本地数据比云端更新，确定要用云端数据覆盖吗？')) return;
         }
         const savedGistId = gameState.daveLab.githubGistId;
+        runMigrations(imported);
         gameState = deepMerge(JSON.parse(JSON.stringify(DEFAULT_STATE)), imported);
         gameState.daveLab.githubGistId = savedGistId;
         // Never restore token from cloud data
         delete gameState.daveLab.githubGistToken;
         if (!gameState.daveLab.autoSync) gameState.daveLab.autoSync = false;
         saveGame(); renderAll();
+        consumePendingReminders();
         showToast('☁️ 数据已从云端恢复！');
         closeDaveLab();
     } catch(e) { showToast('恢复失败: ' + e.message); }
@@ -2250,11 +2274,13 @@ async function autoSyncPull() {
         if (remoteTime > localTime) {
             const savedGistId = gameState.daveLab.githubGistId;
             const savedAutoSync = gameState.daveLab.autoSync;
+            runMigrations(imported);
             gameState = deepMerge(JSON.parse(JSON.stringify(DEFAULT_STATE)), imported);
             gameState.daveLab.githubGistId = savedGistId;
             gameState.daveLab.autoSync = savedAutoSync;
             delete gameState.daveLab.githubGistToken;
             saveGame(); renderAll();
+            consumePendingReminders();
         }
     } catch(e) { /* silent fail */ }
 }
@@ -2381,18 +2407,22 @@ function renderBattlefield() {
         return;
     }
     const isDisciplineViolation = gameState.character.brokenShield;
+    const waveCount = gameState.daveLab.waveCount || 3;
     let html = '';
-    for (let w = 1; w <= 3; w++) {
+    for (let w = 1; w <= waveCount; w++) {
         const waveItems = parsed.filter(h => h.wave === w);
         if (!waveItems.length) continue;
         const cleared = gameState.homework.waveCleared[w - 1];
-        const waveNames = ['第一波 — 前锋僵尸', '第二波 — 路障僵尸', '第三波 — BOSS 巨人僵尸'];
-        const waveIcons = ['🧟', '🧟‍♂️', '👹'];
+        const waveIcon = w === waveCount ? '👹' : w === 1 ? '🧟' : '🧟‍♂️';
+        const waveName = w === waveCount ? '第' + w + '波 — BOSS 巨人僵尸' : '第' + w + '波 — 僵尸军团';
         const doneCount = waveItems.filter(h => h.status === 'completed').length;
+        const progressPct = Math.round(doneCount / waveItems.length * 100);
         html += '<div class="wave-header ' + (cleared ? 'cleared' : '') + '" data-wave="' + w + '" ondragover="hwWaveDragOver(event)" ondrop="hwWaveDrop(event,' + w + ')" ondragleave="hwWaveDragLeave(event)">';
-        html += '<h3>' + waveIcons[w-1] + ' ' + waveNames[w-1] + '</h3>';
+        html += '<h3>' + waveIcon + ' ' + waveName + '</h3>';
         html += '<span class="wave-status">' + doneCount + '/' + waveItems.length + (cleared ? ' ✅' : '') + '</span>';
-        html += '<span style="font-size:0.7em;color:rgba(255,255,255,0.3);margin-left:8px;">拖拽卡片到此波次</span></div>';
+        html += '<span style="font-size:0.7em;color:rgba(255,255,255,0.3);margin-left:8px;">拖拽卡片到此波次</span>';
+        html += '<div class="wave-progress-wrap"><div class="wave-progress-bar" style="width:' + progressPct + '%"></div></div>';
+        html += '</div>';
         // Check for optional pairs in this wave
         const renderedIds = new Set();
         html += '<div class="homework-grid">';
@@ -2422,14 +2452,14 @@ function renderBattlefield() {
 }
 function renderHwCard(hw, isDisciplineViolation, isChoice) {
     const done = hw.status === 'completed';
-    const bossStyle = hw.wave === 3 ? 'border-color:rgba(220,53,69,0.4);' : '';
+    const bossStyle = hw.wave === (gameState.daveLab.waveCount || 3) ? 'border-color:rgba(220,53,69,0.4);' : '';
     const dragAttr = !done ? ' draggable="true" ondragstart="hwDragStart(event,\'' + hw.id + '\')" ondragend="hwDragEnd(event)"' : '';
     let html = '<div class="hw-card ' + (done ? 'completed undo-pending' : '') + (isChoice ? ' choice-highlight' : '') + '" data-hw-id="' + hw.id + '" data-hw-wave="' + hw.wave + '" style="' + bossStyle + 'display:flex;align-items:stretch;"' + dragAttr + ' ondragover="hwDragOver(event)" ondrop="hwDrop(event,\'' + hw.id + '\')" ondragleave="hwDragLeave(event)">';
     // V8: Delete button
     if (!done) html += '<button class="btn-delete-hw" onclick="event.stopPropagation();deleteHomework(\'' + hw.id + '\')" title="删除此作业">×</button>';
     html += '<div style="flex:1;">';
-    html += '<span class="subject-tag subject-' + hw.subjectClass + '">' + hw.subject + '</span>';
-    if (hw.wave === 3 && !done) html += ' <span style="font-size:0.8em;">💀</span>';
+    html += '<span class="subject-tag subject-' + hw.subjectClass + '" onclick="event.stopPropagation();cycleSubject(\'' + hw.id + '\')" style="cursor:pointer;" title="点击切换科目">' + hw.subject + '</span>';
+    if (hw.wave === (gameState.daveLab.waveCount || 3) && !done) html += ' <span style="font-size:0.8em;">💀</span>';
     html += '<div class="hw-desc">' + (done ? '✅ ' : '') + hw.description + '</div>';
     html += '<div class="hw-meta">';
     html += '<div class="hw-meta-tags">';
@@ -2455,6 +2485,7 @@ function renderHwCard(hw, isDisciplineViolation, isChoice) {
 }
 function renderRoutines() {
     const container = document.getElementById('routineContent');
+    recalculateCompressedTimes();
     let html = '';
     // Departure countdown
     const schedule = calculateDepartureSchedule();
@@ -2509,10 +2540,12 @@ function renderRoutines() {
     sortedTasks.forEach((task, idx) => {
         const done = task.completed;
         const routineEmoji = getRoutineEmoji(task.name, task.icon);
-        // Time-based highlighting
-        const [tH, tM] = task.time.split(':').map(Number);
+        const displayTime = task._adjTime || task.time;
+        const displayDur = task._adjDur || task.duration || 10;
+        const isCompressed = task._adjTime && task._adjTime !== task.time;
+        const [tH, tM] = displayTime.split(':').map(Number);
         const taskMin = tH * 60 + tM;
-        const dur = task.duration || 10;
+        const dur = displayDur;
         const isCurrent = !done && nowMin >= taskMin - 5 && nowMin <= taskMin + dur + 10;
         const isPast = nowMin > taskMin + dur + 10;
         const isFuture = nowMin < taskMin - 5;
@@ -2522,8 +2555,12 @@ function renderRoutines() {
         html += '<span class="routine-icon">' + routineEmoji + '</span>';
         html += '<span class="routine-name">' + task.name + '</span>';
         html += '</div>';
-        html += '<span class="routine-time">' + task.time + '</span>';
-        html += '<span class="routine-duration">⏱️ ' + dur + '分</span>';
+        html += '<span class="routine-time">' + displayTime;
+        if (isCompressed) html += ' <span style="font-size:0.7em;color:#ff8a8a;text-decoration:line-through;">' + task.time + '</span>';
+        html += '</span>';
+        html += '<span class="routine-duration">⏱️ ' + displayDur + '分';
+        if (isCompressed) html += ' <span style="font-size:0.7em;color:#ff8a8a;">压缩</span>';
+        html += '</span>';
         html += '<div class="routine-rewards">';
         html += '<span class="reward-tag">🧪+' + task.fertilizerWeight + '</span>';
         html += '<span class="reward-tag">🪙+' + task.coinReward + '</span>';
@@ -2708,6 +2745,38 @@ function calculateDepartureSchedule() {
         return !t.completed && h * 60 + m <= nowMin + 30;
     });
     return { deadline, morningTasks, currentTask: currentTask || morningTasks.find(t => !t.completed) };
+}
+function recalculateCompressedTimes() {
+    gameState.routines.tasks.forEach(t => { t._adjTime = null; t._adjDur = null; });
+    if (gameState.routines.compressionEnabled === false) return;
+    const deadline = gameState.routines.departureDeadline || '08:00';
+    const [dH, dM] = deadline.split(':').map(Number);
+    const deadlineMin = dH * 60 + dM;
+    const morningTasks = gameState.routines.tasks
+        .filter(t => { const [h, m] = t.time.split(':').map(Number); return h * 60 + m < deadlineMin; })
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+    if (!morningTasks.length) return;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const remaining = morningTasks.filter(t => !t.completed);
+    if (!remaining.length) return;
+    const first = remaining[0];
+    const [fH, fM] = first.time.split(':').map(Number);
+    const scheduledStart = fH * 60 + fM;
+    const actualStart = Math.max(nowMin, scheduledStart);
+    const totalDur = remaining.reduce((s, t) => s + (t.duration || 10), 0);
+    const available = deadlineMin - actualStart;
+    if (available <= 0 || totalDur <= 0 || available >= totalDur) return;
+    const ratio = available / totalDur;
+    let cursor = actualStart;
+    for (const task of morningTasks) {
+        if (task.completed) continue;
+        const adjH = Math.floor(cursor / 60);
+        const adjM = Math.round(cursor % 60);
+        task._adjTime = String(adjH).padStart(2, '0') + ':' + String(adjM).padStart(2, '0');
+        task._adjDur = Math.max(1, Math.round((task.duration || 10) * ratio));
+        cursor += task._adjDur;
+    }
 }
 function renderGarden() {
     const container = document.getElementById('gardenContent');
@@ -3202,6 +3271,14 @@ function renderDaveLab() {
     dept += '<input type="time" value="' + (gameState.routines.departureDeadline || '08:00') + '" onchange="gameState.routines.departureDeadline=this.value;saveGame();renderRoutines();" style="padding:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;">';
     dept += '</div>';
     dept += '<p style="color:#888;font-size:0.85em;margin-top:8px;">系统会根据截止时间和各任务时长，自动计算出门倒计时</p>';
+    dept += '<div style="display:flex;gap:12px;align-items:center;margin-top:12px;">';
+    dept += '<label style="color:#ccc;">战斗波次数:</label>';
+    dept += '<input type="number" value="' + (gameState.daveLab.waveCount || 3) + '" min="1" max="10" onchange="gameState.daveLab.waveCount=Math.max(1,parseInt(this.value)||3);saveGame();" style="width:60px;padding:8px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;">';
+    dept += '</div>';
+    dept += '<p style="color:#888;font-size:0.85em;margin-top:4px;">设置作业分成几波僵尸（每波至少1个任务），修改后重新解析作业生效</p>';
+    dept += '<label style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;">';
+    dept += '<input type="checkbox" ' + (gameState.routines.compressionEnabled !== false ? 'checked' : '') + ' onchange="gameState.routines.compressionEnabled=this.checked;saveGame();renderRoutines();" style="width:20px;height:20px;">';
+    dept += '<span style="color:#ccc;">⏱️ 迟到自动压缩（剩余任务按比例缩短以赶上出门时间）</span></label>';
     html += labSection('departure', '🚪', '出门管理', dept);
     // 3. 奖励调控 (DDA)
     let rw = sliderHTML('labSunshineBase', '阳光基数 (DDA)', w.sunshineBase, 10, 200, 1);
@@ -3273,7 +3350,16 @@ function renderDaveLab() {
     remind += '<input type="text" id="adHocReminderInput" placeholder="输入提醒内容..." style="flex:1;min-width:200px;padding:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;font-size:1em;">';
     remind += '<button class="btn btn-sunshine btn-sm" onclick="sendAdHocReminder()">📢 发送提醒</button>';
     remind += '</div>';
-    remind += '<p style="color:#888;font-size:0.85em;margin-top:8px;">提醒会以趣味弹窗+语音方式呈现给孩子</p>';
+    remind += '<p style="color:#888;font-size:0.85em;margin-top:8px;">提醒会以趣味弹窗+语音方式呈现给孩子。开启云同步后，提醒会自动推送到孩子的设备（约30秒延迟）</p>';
+    const pending = (gameState.daveLab.pendingReminders || []).filter(r => !r.consumed);
+    if (pending.length > 0) {
+        remind += '<div style="margin-top:10px;padding:8px;background:rgba(255,215,0,0.1);border-radius:10px;border:1px solid rgba(255,215,0,0.2);">';
+        remind += '<div style="font-size:0.85em;color:#ffc97d;margin-bottom:6px;">📬 待推送提醒 (' + pending.length + ')</div>';
+        pending.forEach(r => {
+            remind += '<div style="font-size:0.85em;color:#ccc;padding:2px 0;">• ' + r.message + '</div>';
+        });
+        remind += '</div>';
+    }
     html += labSection('reminders', '📢', '临时提醒', remind);
     // 8. 语音设置
     let voice = '<div style="display:flex;flex-direction:column;gap:10px;">';
@@ -3406,7 +3492,58 @@ function sendAdHocReminder() {
     const msg = input.value.trim();
     if (!msg) { showToast('请输入提醒内容'); return; }
     input.value = '';
+    if (!gameState.daveLab.pendingReminders) gameState.daveLab.pendingReminders = [];
+    gameState.daveLab.pendingReminders.push({
+        id: 'rem_' + Date.now(), message: msg, createdAt: new Date().toISOString(), consumed: false
+    });
+    saveGame();
     showReminderPopup(msg);
+    if (getGistToken() && gameState.daveLab.githubGistId) {
+        syncToGist();
+        showToast('提醒已发送并同步到云端，孩子设备将在30秒内收到');
+    } else {
+        showToast('提醒已发送（本地）。配置云同步后可跨设备推送');
+    }
+}
+function consumePendingReminders() {
+    const reminders = gameState.daveLab.pendingReminders;
+    if (!reminders || !reminders.length) return;
+    let changed = false;
+    reminders.forEach(r => {
+        if (!r.consumed) {
+            r.consumed = true;
+            changed = true;
+            showReminderPopup(r.message);
+        }
+    });
+    if (changed) saveGame();
+}
+async function pollRemoteReminders() {
+    const token = getGistToken();
+    const gistId = gameState.daveLab.githubGistId;
+    if (!token || !gistId || !gameState.daveLab.autoSync) return;
+    try {
+        const resp = await fetch('https://api.github.com/gists/' + gistId, {
+            headers: { 'Authorization': 'token ' + token }
+        });
+        if (!resp.ok) return;
+        const result = await resp.json();
+        const file = result.files['pvzquest-save.json'];
+        if (!file) return;
+        const remote = JSON.parse(file.content);
+        const remoteReminders = remote.daveLab && remote.daveLab.pendingReminders;
+        if (!remoteReminders || !remoteReminders.length) return;
+        const localIds = new Set((gameState.daveLab.pendingReminders || []).map(r => r.id));
+        let hasNew = false;
+        remoteReminders.forEach(r => {
+            if (!localIds.has(r.id) && !r.consumed) {
+                if (!gameState.daveLab.pendingReminders) gameState.daveLab.pendingReminders = [];
+                gameState.daveLab.pendingReminders.push(r);
+                hasNew = true;
+            }
+        });
+        if (hasNew) consumePendingReminders();
+    } catch(e) {}
 }
 function copyGameDataToClipboard() {
     const data = JSON.stringify(gameState, null, 2);
@@ -3428,7 +3565,7 @@ function pasteGameDataFromClipboard() {
         const imported = JSON.parse(input);
         if (!imported.version) { showToast('无效的数据'); return; }
         gameState = deepMerge(JSON.parse(JSON.stringify(DEFAULT_STATE)), imported);
-        migrateToV6();
+        runMigrations(gameState);
         saveGame(); renderAll();
         showToast('数据恢复成功！');
         closeDaveLab();
@@ -3533,7 +3670,7 @@ function parseAndLoadHomework() {
     gameState.homework.parsed = assignWaves(result.parsed);
     gameState.homework.optionalPairs = result.optionalPairs;
     gameState.homework.currentWave = 1;
-    gameState.homework.waveCleared = [false, false, false];
+    gameState.homework.waveCleared = new Array(gameState.daveLab.waveCount || 3).fill(false);
     gameState.homework.bossUnlocked = false;
     saveGame(); renderBattlefield();
     audioQueue.playSFX('waveAlarm');
@@ -3542,31 +3679,64 @@ function parseAndLoadHomework() {
 }
 function clearHomework() {
     if (!confirm('确定清空所有作业？')) return;
-    gameState.homework = { rawText: '', parsed: [], currentWave: 1, waveCleared: [false, false, false], bossUnlocked: false, optionalPairs: [] };
+    gameState.homework = { rawText: '', parsed: [], currentWave: 1, waveCleared: new Array(gameState.daveLab.waveCount || 3).fill(false), bossUnlocked: false, optionalPairs: [] };
     document.getElementById('homeworkInput').value = '';
     saveGame(); renderBattlefield();
 }
 // V8: Manual add/delete homework + undo completion
 function showAddHomeworkDialog() {
-    const desc = prompt('输入作业描述（如：数学练习册p.25）');
-    if (!desc || !desc.trim()) return;
-    const subjectMatch = desc.match(SUBJECT_RE);
-    const subject = subjectMatch ? subjectMatch[1] : '其他';
+    const modal = document.getElementById('addHomeworkModal');
+    if (!modal) {
+        const div = document.createElement('div');
+        div.id = 'addHomeworkModal';
+        div.className = 'modal-overlay';
+        div.innerHTML = '<div class="modal-box" style="max-width:400px;">' +
+            '<div class="modal-icon">📝</div><div class="modal-title">手动添加作业</div>' +
+            '<div style="display:flex;flex-direction:column;gap:12px;padding:10px 0;">' +
+            '<input type="text" id="addHwDesc" placeholder="作业描述（如：练习册p.25）" style="padding:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;font-size:1em;">' +
+            '<select id="addHwSubject" style="padding:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;font-size:1em;">' +
+            AVAILABLE_SUBJECTS.map(s => '<option value="' + s + '">' + s + '</option>').join('') +
+            '</select></div>' +
+            '<div class="modal-actions">' +
+            '<button class="btn btn-sunshine" onclick="confirmAddHomework()">添加</button>' +
+            '<button class="btn btn-primary" onclick="document.getElementById(\'addHomeworkModal\').classList.remove(\'show\')">取消</button>' +
+            '</div></div>';
+        document.body.appendChild(div);
+    }
+    document.getElementById('addHwDesc').value = '';
+    document.getElementById('addHwSubject').value = '其他';
+    document.getElementById('addHomeworkModal').classList.add('show');
+}
+function confirmAddHomework() {
+    const desc = document.getElementById('addHwDesc').value.trim();
+    const subject = document.getElementById('addHwSubject').value;
+    if (!desc) { showToast('请输入作业描述'); return; }
     const subjectClass = SUBJECT_MAP[subject] || 'default';
     let difficulty = 2;
     for (const [level, re] of Object.entries(DIFFICULTY_KEYWORDS)) {
         if (re.test(desc)) { difficulty = parseInt(level); break; }
     }
-    const wave = difficulty === 1 ? 1 : difficulty === 2 ? 2 : 3;
-    const sunReward = difficulty === 1 ? 30 : difficulty === 2 ? 50 : 80;
-    const newId = 'hw_manual_' + Date.now();
+    const waveCount = gameState.daveLab.waveCount || 3;
+    const wave = Math.min(difficulty, waveCount);
+    const ratio = wave / waveCount;
+    const sunReward = ratio < 0.34 ? 30 : ratio < 0.67 ? 50 : 80;
     gameState.homework.parsed.push({
-        id: newId, subject, subjectClass, description: desc.trim(),
+        id: 'hw_manual_' + Date.now(), subject, subjectClass, description: desc,
         pageNum: null, seqNum: 0, required: true, difficulty, wave,
         status: 'pending', completedAt: null, sunshineReward: sunReward, droppedPlantCard: null
     });
+    document.getElementById('addHomeworkModal').classList.remove('show');
     saveGame(); renderBattlefield();
-    showToast('已添加作业: ' + desc.trim());
+    showToast('已添加作业: ' + desc);
+}
+function cycleSubject(hwId) {
+    const hw = gameState.homework.parsed.find(h => h.id === hwId);
+    if (!hw || hw.status === 'completed') return;
+    const idx = AVAILABLE_SUBJECTS.indexOf(hw.subject);
+    const next = AVAILABLE_SUBJECTS[(idx + 1) % AVAILABLE_SUBJECTS.length];
+    hw.subject = next;
+    hw.subjectClass = SUBJECT_MAP[next] || 'default';
+    saveGame(); renderBattlefield();
 }
 function deleteHomework(hwId) {
     const hw = gameState.homework.parsed.find(h => h.id === hwId);
@@ -3584,7 +3754,8 @@ function undoHomework(hwId) {
     hw.status = 'pending';
     hw.completedAt = null;
     // Recalculate wave cleared status
-    for (let w = 1; w <= 3; w++) {
+    const waveCount = gameState.daveLab.waveCount || 3;
+    for (let w = 1; w <= waveCount; w++) {
         const waveItems = gameState.homework.parsed.filter(h => h.wave === w);
         gameState.homework.waveCleared[w - 1] = waveItems.length > 0 && waveItems.every(h => h.status === 'completed');
     }
@@ -3655,13 +3826,12 @@ function hwWaveDrop(e, targetWave) {
     const hw = gameState.homework.parsed.find(h => h.id === sourceId);
     if (!hw) return;
     if (hw.wave === targetWave) { showToast('已经在这个波次了'); return; }
-    const oldWave = hw.wave;
+    const waveCount = gameState.daveLab.waveCount || 3;
     hw.wave = targetWave;
-    // Adjust sunshine reward based on new wave
-    hw.sunshineReward = targetWave === 1 ? 30 : targetWave === 2 ? 50 : 80;
+    const ratio = targetWave / waveCount;
+    hw.sunshineReward = ratio < 0.34 ? 30 : ratio < 0.67 ? 50 : 80;
     saveGame(); renderBattlefield();
-    const waveNames = ['前锋僵尸', '路障僵尸', 'BOSS巨人僵尸'];
-    showToast('「' + hw.description + '」移至第' + targetWave + '波 ' + waveNames[targetWave - 1]);
+    showToast('「' + hw.description + '」移至第' + targetWave + '波');
     audioQueue.playSFX('click');
 }
 function showDirtParticles(el) {
@@ -4050,7 +4220,6 @@ function testAzureTTS() {
 // State machine: idle -> listening -> thinking -> (confirming | resolved)
 // Only activates on task trigger or manual mic click — no background scanning
 const INTENT_WEIGHTS = {
-    // Positive (complete) keywords
     positive: [
         { word: '完成', weight: 2 }, { word: '搞定', weight: 2 }, { word: '做完', weight: 2 },
         { word: '好了', weight: 1.5 }, { word: '做好', weight: 1.5 }, { word: '完', weight: 1 },
@@ -4058,15 +4227,27 @@ const INTENT_WEIGHTS = {
         { word: '对', weight: 1 }, { word: '是', weight: 0.8 }, { word: '嗯', weight: 0.8 },
         { word: '行', weight: 1 }, { word: '可以', weight: 1 }, { word: '没问题', weight: 1.5 }
     ],
-    // Negative (delay) keywords
     negative: [
         { word: '等一下', weight: -2 }, { word: '稍等', weight: -2 }, { word: '等等', weight: -1.5 },
         { word: '还没', weight: -2 }, { word: '没有', weight: -1.5 }, { word: '不', weight: -1 },
-        { word: '再等', weight: -2 }, { word: '3分钟', weight: -1.5 }, { word: '五分钟', weight: -1.5 },
-        { word: '三分钟', weight: -1.5 }, { word: '等', weight: -0.8 }, { word: '没', weight: -0.8 },
-        { word: '不行', weight: -1.5 }, { word: '不要', weight: -1.5 }
+        { word: '再等', weight: -2 }, { word: '等', weight: -0.8 }, { word: '没', weight: -0.8 },
+        { word: '不行', weight: -1.5 }, { word: '不要', weight: -1.5 },
+        { word: '分钟', weight: -1.5 }, { word: '一会', weight: -1.5 }, { word: '待会', weight: -1.5 }
     ]
 };
+const DELAY_PATTERNS = [
+    { re: /(\d+)\s*分钟/, extract: m => parseInt(m[1]) },
+    { re: /一分钟/, extract: () => 1 }, { re: /两分钟/, extract: () => 2 },
+    { re: /三分钟/, extract: () => 3 }, { re: /五分钟/, extract: () => 5 },
+    { re: /十分钟/, extract: () => 10 }, { re: /半小时/, extract: () => 30 }
+];
+function parseDelayMinutes(text) {
+    for (const p of DELAY_PATTERNS) {
+        const m = text.match(p.re);
+        if (m) return p.extract(m);
+    }
+    return 5;
+}
 
 const STITCH_RESPONSES = {
     complete: [
@@ -4185,10 +4366,9 @@ class SpeechContext {
                 if (confirmScore > 0) {
                     this._resolveComplete();
                 } else if (confirmScore < 0) {
-                    this._resolveDelay();
+                    this._resolveDelay(confirmText);
                 } else {
-                    // Still unclear, just delay
-                    this._resolveDelay();
+                    this._resolveDelay(confirmText);
                 }
             };
             // Restart recognition for confirmation
@@ -4198,12 +4378,11 @@ class SpeechContext {
             }, 2000);
             return;
         }
-        // Calculate intent score
         const score = this._calculateIntentScore(transcript);
         if (score > 0) {
             this._resolveComplete();
         } else if (score < 0) {
-            this._resolveDelay();
+            this._resolveDelay(transcript);
         } else {
             // Ambiguous — ask for clarification
             this.state = 'confirming';
@@ -4214,7 +4393,7 @@ class SpeechContext {
             this._confirmCallback = (confirmText) => {
                 const cs = this._calculateIntentScore(confirmText);
                 if (cs >= 0) this._resolveComplete();
-                else this._resolveDelay();
+                else this._resolveDelay(confirmText);
             };
             this.state = 'listening';
             setTimeout(() => {
@@ -4243,8 +4422,9 @@ class SpeechContext {
         }
         setTimeout(() => this.stop(), 1500);
     }
-    _resolveDelay() {
+    _resolveDelay(transcript) {
         this.state = 'resolved';
+        this._delayMinutes = transcript ? parseDelayMinutes(transcript) : 5;
         const response = STITCH_RESPONSES.delay[Math.floor(Math.random() * STITCH_RESPONSES.delay.length)];
         azureTTS.speak(response);
         this._updateUI('delay', response);
@@ -4257,7 +4437,7 @@ class SpeechContext {
         const indicator = document.getElementById('voiceIndicator');
         if (!indicator) return;
         if (phase === 'listening') {
-            indicator.innerHTML = '🎤 <span style="animation:pulse 1s infinite;">正在聆听...</span> 说"完成/搞定"或"等一下"';
+            indicator.innerHTML = '🎤 <span style="animation:pulse 1s infinite;">正在聆听...</span> 说"完成/搞定"或"等X分钟"';
         } else if (phase === 'thinking') {
             const thinkMsg = STITCH_RESPONSES.thinking[Math.floor(Math.random() * STITCH_RESPONSES.thinking.length)];
             indicator.innerHTML = '<span class="stitch-thinking">👽</span> ' + thinkMsg;
@@ -4312,8 +4492,8 @@ function showReminderPopup(message, taskId) {
     document.getElementById('reminderText').textContent = message;
     let actions = '<button class="btn btn-sunshine" onclick="dismissReminder(\'done\')">✅ 完成了！</button>';
     actions += '<button class="btn btn-ice btn-sm" onclick="dismissReminder(\'snooze\')">⏰ 等一下(5分钟)</button>';
-    // Manual mic button
-    if (speechCtx.isSupported() && gameState.voice.useSpeechRecognition) {
+    // Manual mic button — always show if speech recognition is supported
+    if (speechCtx.isSupported()) {
         actions += '<button class="mic-btn" id="manualMicBtn" onclick="toggleManualMic()" title="点击开始语音识别">🎤</button>';
     }
     document.getElementById('reminderActions').innerHTML = actions;
@@ -4322,8 +4502,9 @@ function showReminderPopup(message, taskId) {
     const broadcast = azureTTS.getRandomBroadcast();
     azureTTS.speak(message || broadcast);
     // Start smart voice recognition (SpeechContext state machine)
-    if (gameState.voice.useSpeechRecognition && speechCtx.isSupported()) {
-        document.getElementById('voiceIndicator').innerHTML = '🎤 <span style="animation:pulse 1s infinite;">正在聆听...</span> 说"完成/搞定"或"等一下"';
+    // Always auto-start voice recognition when reminder pops up
+    if (speechCtx.isSupported()) {
+        document.getElementById('voiceIndicator').innerHTML = '🎤 <span style="animation:pulse 1s infinite;">正在聆听...</span> 说"完成/搞定"或"等X分钟"';
         speechCtx.startListening(taskId, message);
     } else {
         document.getElementById('voiceIndicator').textContent = '';
@@ -4367,25 +4548,25 @@ function dismissReminder(action) {
             }
         }
     } else if (action === 'snooze') {
+        const delayMin = speechCtx._delayMinutes || 5;
+        speechCtx._delayMinutes = null;
         const style = gameState.voice.voiceStyle || 'stitch';
         if (style === 'stitch') {
             const resp = STITCH_RESPONSES.delay[Math.floor(Math.random() * STITCH_RESPONSES.delay.length)];
             showToast(resp);
         } else {
-            showToast('好的，5分钟后再提醒你！');
+            showToast('好的，' + delayMin + '分钟后再提醒你！');
         }
         if (activeReminder) {
             const msg = activeReminder.message;
             const tid = activeReminder.taskId;
             const maxNag = gameState.voice.reminderMaxCount || 3;
             const nagInfo = tid ? reminderNagTimers[tid] : null;
-            // Auto-nag: schedule next reminder if under max count
             if (nagInfo && nagInfo.count < maxNag) {
-                nagInfo.timer = setTimeout(() => showReminderPopup(msg, tid), 5 * 60 * 1000);
+                nagInfo.timer = setTimeout(() => showReminderPopup(msg, tid), delayMin * 60 * 1000);
             } else if (!nagInfo) {
-                setTimeout(() => showReminderPopup(msg, tid), 5 * 60 * 1000);
+                setTimeout(() => showReminderPopup(msg, tid), delayMin * 60 * 1000);
             } else {
-                // Max nag reached — stop nagging
                 showToast('已达到最大催促次数，指挥官自己安排时间吧！');
             }
         }
@@ -4441,6 +4622,8 @@ function startApp() {
     }, 600000);
     // Task time reminders
     initTaskReminders();
+    // Cross-device reminder polling (every 30s)
+    setInterval(pollRemoteReminders, 30000);
     // Welcome motivational voice broadcast
     const welcomeLine = getDaveLine('welcome');
     showToast(welcomeLine);
@@ -4457,27 +4640,33 @@ function startApp() {
 function initTaskReminders() {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'default') Notification.requestPermission();
-    // Check every minute for task reminders
+    requestWakeLock();
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkMissedReminders();
+            requestWakeLock();
+            renderRoutines();
+        }
+    });
     setInterval(() => {
+        recalculateCompressedTimes();
         const now = new Date();
         const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
         gameState.routines.tasks.forEach(task => {
-            if (!task.completed && task.time === hhmm) {
-                // Show fun reminder popup with TTS
+            if (task.completed) return;
+            const checkTime = task._adjTime || task.time;
+            if (checkTime === hhmm) {
                 const msg = task.icon + ' 该做「' + task.name + '」啦！完成可获得化肥和金币哦！';
-                showReminderPopup(msg, task.id);
-                // Also browser notification as backup
-                if (Notification.permission === 'granted') {
-                    new Notification('🌻 PVZ Quest 提醒', {
-                        body: msg, tag: 'routine_' + task.id
-                    });
+                if (document.visibilityState === 'visible') {
+                    showReminderPopup(msg, task.id);
+                } else {
+                    showPersistentNotification(msg, task.id);
+                    playBackgroundAlarm();
                 }
             }
         });
-        // Departure deadline warning
         const deadline = gameState.routines.departureDeadline || '08:00';
         const [dH, dM] = deadline.split(':').map(Number);
-        const deadlineHHMM = String(dH).padStart(2,'0') + ':' + String(dM - 10 >= 0 ? dM - 10 : dM + 50).padStart(2,'0');
         const deadlineWarnHour = dM - 10 >= 0 ? dH : dH - 1;
         const warnHHMM = String(deadlineWarnHour).padStart(2,'0') + ':' + String((dM - 10 + 60) % 60).padStart(2,'0');
         if (hhmm === warnHHMM) {
@@ -4486,10 +4675,65 @@ function initTaskReminders() {
                 return !t.completed && h * 60 + m <= dH * 60 + dM;
             });
             if (unfinished.length > 0) {
-                showReminderPopup('⚠️ 还有10分钟就要出门了！还有 ' + unfinished.length + ' 个任务没完成！');
+                const msg = '⚠️ 还有10分钟就要出门了！还有 ' + unfinished.length + ' 个任务没完成！';
+                if (document.visibilityState === 'visible') {
+                    showReminderPopup(msg);
+                } else {
+                    showPersistentNotification(msg, 'departure');
+                    playBackgroundAlarm();
+                }
             }
         }
     }, 60000);
+}
+let _wakeLock = null;
+async function requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try { _wakeLock = await navigator.wakeLock.request('screen'); _wakeLock.addEventListener('release', () => { _wakeLock = null; }); } catch(e) {}
+}
+function showPersistentNotification(msg, taskId) {
+    if (Notification.permission !== 'granted') return;
+    try {
+        new Notification('🌻 PVZ Quest 提醒', {
+            body: msg, tag: 'routine_' + (taskId || 'general'),
+            requireInteraction: true
+        });
+    } catch(e) {}
+}
+function playBackgroundAlarm() {
+    try {
+        audioQueue.init();
+        if (!audioQueue.ctx) return;
+        const ctx = audioQueue.ctx;
+        const playTone = (freq, start, dur) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine'; osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.5, start);
+            gain.gain.exponentialRampToValueAtTime(0.01, start + dur);
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.start(start); osc.stop(start + dur);
+        };
+        const t = ctx.currentTime;
+        for (let i = 0; i < 4; i++) {
+            playTone(880, t + i * 0.6, 0.25);
+            playTone(660, t + i * 0.6 + 0.3, 0.25);
+        }
+    } catch(e) {}
+}
+function checkMissedReminders() {
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    gameState.routines.tasks.forEach(task => {
+        if (task.completed) return;
+        const timeStr = task._adjTime || task.time;
+        const [h, m] = timeStr.split(':').map(Number);
+        const taskMin = h * 60 + m;
+        if (nowMin >= taskMin && nowMin <= taskMin + 10) {
+            const msg = task.icon + ' 该做「' + task.name + '」啦！完成可获得化肥和金币哦！';
+            showReminderPopup(msg, task.id);
+        }
+    });
 }
 function updateClock() {
     const now = new Date();
