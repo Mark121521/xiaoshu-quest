@@ -820,6 +820,30 @@ body::before {
 .voice-indicator span[style*="animation:pulse"] {
     animation: pulse 1s ease infinite !important;
 }
+/* V8: TTS waveform visualizer */
+.tts-waveform {
+    display: inline-flex; align-items: center; gap: 2px; height: 24px; vertical-align: middle; margin-left: 8px;
+}
+.tts-waveform .wave-bar {
+    width: 3px; background: var(--pvz-green-light); border-radius: 2px;
+    transition: height 0.05s ease; min-height: 3px;
+}
+.tts-waveform.active .wave-bar { background: var(--pvz-sunshine); }
+.tts-waveform.silent .wave-bar { background: #666; height: 3px !important; }
+/* V8: Audio activation bubble */
+.audio-activate-bubble {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    padding: 18px 32px; background: linear-gradient(135deg, rgba(74,124,46,0.95), rgba(109,179,63,0.9));
+    border-radius: 25px; border: 3px solid var(--pvz-sunshine);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4), 0 0 20px rgba(255,215,0,0.2);
+    z-index: 9999; cursor: pointer; text-align: center;
+    animation: bubbleBounce 1.5s ease infinite;
+    display: none;
+}
+.audio-activate-bubble.show { display: block; }
+.audio-activate-bubble .bubble-icon { font-size: 2.5em; margin-bottom: 6px; }
+.audio-activate-bubble .bubble-text { font-size: 1.1em; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000; }
+@keyframes bubbleBounce { 0%,100%{transform:translateX(-50%) translateY(0);} 50%{transform:translateX(-50%) translateY(-8px);} }
 /* Mic button in reminder popup */
 .mic-btn {
     background: linear-gradient(135deg, var(--pvz-green), var(--pvz-green-light));
@@ -999,6 +1023,10 @@ body::before {
         <div class="reminder-actions" id="reminderActions"></div>
         <div class="voice-indicator" id="voiceIndicator"></div>
     </div>
+</div>
+<div id="audioActivateBubble" class="audio-activate-bubble" onclick="activateAudioContext()">
+    <div class="bubble-icon">👽</div>
+    <div class="bubble-text">指挥官，点我激活通讯器！</div>
 </div>
 <div id="interestPopup" class="interest-popup" style="display:none;">
     <div style="font-size:2em;margin-bottom:10px;">🏦</div>
@@ -3806,23 +3834,115 @@ const VOICE_STYLES = {
     }
 };
 
+// V8: Shared AudioContext for TTS — must be resumed via user gesture on Android
+let _ttsAudioCtx = null;
+let _ttsAnalyser = null;
+let _ttsGainNode = null;
+let _ttsActivated = false;
+let _ttsWaveformRAF = null;
+
+function getTTSAudioContext() {
+    if (!_ttsAudioCtx) {
+        try {
+            _ttsAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            _ttsGainNode = _ttsAudioCtx.createGain();
+            _ttsGainNode.gain.value = 1.2;
+            _ttsAnalyser = _ttsAudioCtx.createAnalyser();
+            _ttsAnalyser.fftSize = 64;
+            _ttsGainNode.connect(_ttsAnalyser);
+            _ttsAnalyser.connect(_ttsAudioCtx.destination);
+        } catch(e) { return null; }
+    }
+    return _ttsAudioCtx;
+}
+
+function activateAudioContext() {
+    const ctx = getTTSAudioContext();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    audioQueue.init();
+    if (ctx) {
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+    }
+    _ttsActivated = true;
+    const bubble = document.getElementById('audioActivateBubble');
+    if (bubble) bubble.classList.remove('show');
+    showToast('🔊 通讯器已激活！史迪奇可以说话了！');
+}
+
+function createWaveformElement() {
+    const container = document.createElement('span');
+    container.className = 'tts-waveform';
+    container.id = 'ttsWaveform';
+    for (let i = 0; i < 8; i++) {
+        const bar = document.createElement('span');
+        bar.className = 'wave-bar';
+        bar.style.height = '3px';
+        container.appendChild(bar);
+    }
+    return container;
+}
+
+function startWaveformAnimation() {
+    const wf = document.getElementById('ttsWaveform');
+    if (!wf || !_ttsAnalyser) return;
+    wf.classList.add('active');
+    wf.classList.remove('silent');
+    const bars = wf.querySelectorAll('.wave-bar');
+    const dataArray = new Uint8Array(_ttsAnalyser.frequencyBinCount);
+    function draw() {
+        _ttsAnalyser.getByteFrequencyData(dataArray);
+        const step = Math.max(1, Math.floor(dataArray.length / bars.length));
+        let hasSignal = false;
+        bars.forEach((bar, i) => {
+            const val = dataArray[i * step] || 0;
+            const h = Math.max(3, val / 255 * 22);
+            bar.style.height = h + 'px';
+            if (val > 10) hasSignal = true;
+        });
+        if (!hasSignal) wf.classList.add('silent');
+        else wf.classList.remove('silent');
+        _ttsWaveformRAF = requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+function stopWaveformAnimation() {
+    cancelAnimationFrame(_ttsWaveformRAF);
+    const wf = document.getElementById('ttsWaveform');
+    if (wf) {
+        wf.classList.remove('active');
+        wf.classList.add('silent');
+        wf.querySelectorAll('.wave-bar').forEach(b => b.style.height = '3px');
+    }
+}
+
 class AzureTTS {
-    constructor() { this.audioEl = null; }
+    constructor() { this.currentSource = null; this.audioEl = null; }
     getStyleConfig() {
         const style = gameState.voice.voiceStyle || 'stitch';
         return VOICE_STYLES[style] || VOICE_STYLES.stitch;
     }
     async speak(text) {
         if (!gameState.voice.useAzureTTS || !getAzureKey()) {
-            // Fallback to browser SpeechSynthesis
             return this.speakFallback(text);
+        }
+        const ctx = getTTSAudioContext();
+        if (ctx && ctx.state === 'suspended') {
+            if (!_ttsActivated) {
+                const bubble = document.getElementById('audioActivateBubble');
+                if (bubble) bubble.classList.add('show');
+            }
+            try { await ctx.resume(); } catch(e) {}
         }
         try {
             const region = gameState.voice.azureRegion || 'eastasia';
             const config = this.getStyleConfig();
             const voiceName = config.voiceName;
             const escapedText = text.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
-            // Build SSML — stitch style gets contour for playful intonation
             let ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="zh-CN">';
             ssml += '<voice name="' + voiceName + '">';
             if (config.style) ssml += '<mstts:express-as style="' + config.style + '">';
@@ -3831,7 +3951,6 @@ class AzureTTS {
             ssml += '>';
             ssml += escapedText;
             ssml += '</prosody>';
-            // Stitch "question tone" tail — rising pitch pause to hint listening window is open
             if ((gameState.voice.voiceStyle || 'stitch') === 'stitch') {
                 ssml += '<break time="400ms"/><prosody pitch="+80%" rate="1.3" contour="(0%,+20%) (100%,+90%)">嗯？</prosody>';
             }
@@ -3847,20 +3966,42 @@ class AzureTTS {
                 body: ssml
             });
             if (!resp.ok) { console.error('TTS error:', resp.status); return this.speakFallback(text); }
-            const blob = await resp.blob();
+            const arrayBuffer = await resp.arrayBuffer();
+            // Primary path: AudioContext decodeAudioData — best Android compatibility
+            if (ctx && _ttsGainNode) {
+                try {
+                    const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+                    this.stop();
+                    const source = ctx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    _ttsGainNode.gain.value = Math.max(1.0, (gameState.voice.reminderVolume || 0.8) * 1.5);
+                    source.connect(_ttsGainNode);
+                    source.start(0);
+                    this.currentSource = source;
+                    startWaveformAnimation();
+                    return new Promise(resolve => {
+                        source.onended = () => { this.currentSource = null; stopWaveformAnimation(); resolve(true); };
+                    });
+                } catch(decodeErr) {
+                    console.warn('AudioContext decode failed, falling back to <audio>:', decodeErr);
+                }
+            }
+            // Fallback: <audio> tag with blob URL
+            const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
             const url = URL.createObjectURL(blob);
-            if (this.audioEl) { this.audioEl.pause(); URL.revokeObjectURL(this.audioEl.src); }
+            this.stop();
             this.audioEl = new Audio(url);
-            this.audioEl.volume = gameState.voice.reminderVolume || 0.8;
+            this.audioEl.volume = Math.min(1.0, (gameState.voice.reminderVolume || 0.8) * 1.2);
+            startWaveformAnimation();
             await this.audioEl.play();
+            this.audioEl.onended = () => { stopWaveformAnimation(); URL.revokeObjectURL(url); };
             return true;
-        } catch(e) { console.error('TTS failed:', e); return this.speakFallback(text); }
+        } catch(e) { console.error('TTS failed:', e); stopWaveformAnimation(); return this.speakFallback(text); }
     }
     speakFallback(text) {
         if (!('speechSynthesis' in window)) return false;
         const config = this.getStyleConfig();
         const isStitch = (gameState.voice.voiceStyle || 'stitch') === 'stitch';
-        // Stitch fallback: forced high pitch + random prefix + question tail
         let finalText = text;
         if (isStitch) {
             const prefix = STITCH_PREFIXES[Math.floor(Math.random() * STITCH_PREFIXES.length)];
@@ -3884,8 +4025,10 @@ class AzureTTS {
         return true;
     }
     stop() {
+        if (this.currentSource) { try { this.currentSource.stop(); } catch(e) {} this.currentSource = null; }
         if (this.audioEl) { this.audioEl.pause(); this.audioEl = null; }
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        stopWaveformAnimation();
     }
     getRandomBroadcast() {
         const config = this.getStyleConfig();
@@ -4161,6 +4304,11 @@ function showReminderPopup(message, taskId) {
     const style = gameState.voice.voiceStyle || 'stitch';
     const iconMap = { stitch: '👽', warrior: '🔥', frost: '❄️' };
     document.getElementById('reminderIcon').textContent = iconMap[style] || '🌻';
+    // V8: Inject waveform visualizer next to icon
+    const iconEl = document.getElementById('reminderIcon');
+    let wfEl = document.getElementById('ttsWaveform');
+    if (!wfEl) { wfEl = createWaveformElement(); }
+    iconEl.parentNode.insertBefore(wfEl, iconEl.nextSibling);
     document.getElementById('reminderText').textContent = message;
     let actions = '<button class="btn btn-sunshine" onclick="dismissReminder(\'done\')">✅ 完成了！</button>';
     actions += '<button class="btn btn-ice btn-sm" onclick="dismissReminder(\'snooze\')">⏰ 等一下(5分钟)</button>';
@@ -4248,6 +4396,8 @@ function dismissReminder(action) {
 // ==================== APP_INIT ====================
 function startApp() {
     document.getElementById('startScreen').style.display = 'none';
+    // V8: Activate AudioContext on user gesture (critical for Android)
+    activateAudioContext();
     audioQueue.init();
     loadGame();
     dailyReset();
