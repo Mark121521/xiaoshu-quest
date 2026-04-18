@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PVZ Quest V9 - 小树植物大战僵尸教育系统</title>
+<title>PVZ Quest V10 - 小树植物大战僵尸教育系统</title>
 <style>
 /* ==================== CSS_RESET ==================== */
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -615,6 +615,69 @@ body::before {
     100% { opacity: 0; transform: scale(0.3) translateY(30px) translateX(var(--dx, 10px)); }
 }
 /* ==================== V6.1 PVZ IMMERSIVE CSS ==================== */
+/* V10: Mandatory task — red glow border */
+.hw-card.hw-mandatory {
+    border-color: rgba(220,53,69,0.5) !important;
+    animation: mandatoryPulse 2s ease infinite;
+}
+@keyframes mandatoryPulse {
+    0%,100% { box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 8px rgba(220,53,69,0.3); }
+    50% { box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 18px rgba(220,53,69,0.6); }
+}
+/* V10: Optional task — gold border + sunshine glow */
+.hw-card.hw-optional {
+    border-color: rgba(255,215,0,0.5) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 12px rgba(255,215,0,0.15) !important;
+}
+.hw-card.hw-optional::after {
+    content: '☀️×2'; position: absolute; top: 6px; left: 6px;
+    font-size: 0.65em; padding: 2px 6px; border-radius: 6px;
+    background: rgba(255,215,0,0.25); color: var(--pvz-sunshine);
+}
+/* V10: Toggle mandatory button */
+.btn-toggle-mandatory {
+    position: absolute; top: 6px; right: 34px; background: rgba(0,0,0,0.3);
+    border: none; border-radius: 50%; width: 24px; height: 24px;
+    font-size: 0.7em; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    opacity: 0.6; transition: all 0.2s;
+}
+.btn-toggle-mandatory:hover { opacity: 1; background: rgba(0,0,0,0.5); }
+/* V10: Panoramic battlefield layout */
+.battlefield-panorama {
+    display: flex; gap: 12px; align-items: flex-start;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin; padding: 4px 0;
+}
+.wave-column {
+    flex: 1; min-width: 260px; max-width: 400px;
+}
+.wave-column .wave-header {
+    margin: 0 0 8px; padding: 10px 14px 8px; border-radius: 14px 14px 0 0;
+}
+.wave-column .wave-header h3 { font-size: 1em; }
+.homework-grid-panorama {
+    display: flex; flex-direction: column; gap: 10px;
+}
+.homework-grid-panorama .hw-card {
+    transform: scale(0.88); transform-origin: top center;
+    margin-bottom: -8px;
+    padding: 14px !important; border-radius: 18px !important;
+}
+.homework-grid-panorama .hw-card .hw-desc { font-size: 1em; }
+.homework-grid-panorama .hw-card .btn-pea { width: 48px !important; height: 48px !important; font-size: 1.4em !important; }
+.choice-pair-vertical {
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 6px; border: 2px dashed rgba(255,215,0,0.2); border-radius: 14px;
+    background: rgba(255,215,0,0.03);
+}
+.choice-or-mini {
+    text-align: center; font-weight: bold; color: var(--pvz-sunshine); font-size: 0.9em; padding: 2px 0;
+}
+@media (max-width: 768px) {
+    .battlefield-panorama { flex-direction: column; }
+    .wave-column { min-width: unset; max-width: unset; }
+    .homework-grid-panorama .hw-card { transform: scale(1); margin-bottom: 0; }
+}
 /* 1. Plant breathe animation */
 @keyframes pvzBreathe {
     0%,100% { transform: scale(1) rotate(0deg); }
@@ -872,7 +935,7 @@ body::before {
 <body>
 
 <div id="startScreen">
-    <h1>PVZ Quest V9</h1>
+    <h1>PVZ Quest V10</h1>
     <p class="subtitle">植物大战僵尸 x 教育系统<br>保卫脑子战场 | 基地能量补给 | 成长花园 | 戴夫秘密金库</p>
     <button class="start-btn" onclick="startApp()">开始战斗</button>
     <p style="color:#555;margin-top:30px;font-size:0.9em;">点击"开始战斗"激活所有功能</p>
@@ -1026,7 +1089,7 @@ body::before {
     </div>
 </div>
 <div style="text-align:center;padding:20px 0 10px;opacity:0.3;font-size:0.75em;">
-    <span style="cursor:pointer;" onclick="openDaveLab()" title="家长管理">PVZ Quest V9 | 🔬</span>
+    <span style="cursor:pointer;" onclick="openDaveLab()" title="家长管理">PVZ Quest V10 | 🔬</span>
 </div>
 </div> <!-- end .container -->
 <div id="reminderPopup" class="reminder-popup" style="display:none;">
@@ -1074,8 +1137,8 @@ body::before {
 <script>
 // ==================== DATA_MODEL ====================
 const DEFAULT_STATE = {
-    version: 9,
-    schemaVersion: 9,
+    version: 10,
+    schemaVersion: 10,
     lastResetDate: '',
     homework: { rawText: '', parsed: [], currentWave: 1, waveCleared: [], bossUnlocked: false, optionalPairs: [], optionalChoices: {} },
     routines: {
@@ -1111,6 +1174,7 @@ const DEFAULT_STATE = {
         plantPriceOverrides: {},
         adHocReminders: [],
         pendingReminders: [],
+        peakHours: { enabled: false, start: '16:00', end: '21:00' },
         githubGistId: '', lastSyncTime: null, autoSync: false
     },
     voice: {
@@ -1277,7 +1341,8 @@ function loadGame() {
 }
 const MIGRATIONS = [
     { from: 7, to: 8, fn: migrateV7toV8 },
-    { from: 8, to: 9, fn: migrateV8toV9 }
+    { from: 8, to: 9, fn: migrateV8toV9 },
+    { from: 9, to: 10, fn: migrateV9toV10 }
 ];
 function runMigrations(data) {
     let ver = data.schemaVersion || data.version || 7;
@@ -1325,6 +1390,22 @@ function migrateV8toV9(data) {
     }
     data.version = 9;
     data.schemaVersion = 9;
+}
+function migrateV9toV10(data) {
+    if (!data.daveLab) data.daveLab = {};
+    if (!data.daveLab.peakHours) data.daveLab.peakHours = { enabled: false, start: '16:00', end: '21:00' };
+    if (data.homework && Array.isArray(data.homework.parsed)) {
+        data.homework.parsed.forEach(hw => {
+            if (hw.isMandatory === undefined) hw.isMandatory = hw.required !== false;
+        });
+    }
+    if (data.daveLab.pendingReminders && Array.isArray(data.daveLab.pendingReminders)) {
+        data.daveLab.pendingReminders.forEach(r => {
+            if (r.emergency === undefined) r.emergency = false;
+        });
+    }
+    data.version = 10;
+    data.schemaVersion = 10;
 }
 function deepMerge(target, source) {
     for (const key in source) {
@@ -1505,6 +1586,7 @@ function parseHomeworkText(rawText) {
             pageNum: pageNum,
             seqNum: seqNum,
             required: isRequired,
+            isMandatory: isRequired,
             difficulty: difficulty,
             wave: 1,
             status: 'pending',
@@ -1598,6 +1680,13 @@ function withdrawSunshine() {
 }
 
 // ==================== WAVE_ENGINE ====================
+function toggleMandatory(hwId) {
+    const hw = gameState.homework.parsed.find(h => h.id === hwId);
+    if (!hw || hw.status === 'completed') return;
+    hw.isMandatory = !hw.isMandatory;
+    saveGame(); renderBattlefield();
+    showToast(hw.isMandatory ? '已设为必做任务' : '已设为选做任务（阳光翻倍）');
+}
 function completeHomework(hwId) {
     const hw = gameState.homework.parsed.find(h => h.id === hwId);
     if (!hw || hw.status === 'completed') return;
@@ -1622,6 +1711,8 @@ function doCompleteHomework(hwId) {
     hw.completedAt = new Date().toISOString();
     // Calculate sunshine reward (discipline penalty applied in applyRewardWeight)
     let sunReward = applyRewardWeight(hw.sunshineReward);
+    // Optional (non-mandatory) tasks get double sunshine
+    if (hw.isMandatory === false) sunReward *= 2;
     // Critical hit: 10% chance for double sunshine
     const isCritical = Math.random() < 0.10;
     if (isCritical) {
@@ -1725,8 +1816,9 @@ function showSunshineTrajectory(fromEl) {
 }
 function checkWaveCleared(waveNum) {
     const waveItems = gameState.homework.parsed.filter(h => h.wave === waveNum);
-    const allDone = waveItems.every(h => h.status === 'completed');
-    if (!allDone) return;
+    const mandatoryItems = waveItems.filter(h => h.isMandatory !== false);
+    const allMandatoryDone = mandatoryItems.length === 0 || mandatoryItems.every(h => h.status === 'completed');
+    if (!allMandatoryDone) return;
     gameState.homework.waveCleared[waveNum - 1] = true;
     const waveBonus = calculateBuff('waveBonus');
     if (waveBonus > 0) addSunshine(waveBonus);
@@ -2184,7 +2276,7 @@ async function syncToGist() {
                 method: 'POST',
                 headers: { 'Authorization': 'token ' + token, 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    description: 'PVZ Quest V9 - 小树植物大战僵尸存档',
+                    description: 'PVZ Quest V10 - 小树植物大战僵尸存档',
                     public: false,
                     files: { 'pvzquest-save.json': { content: data } }
                 })
@@ -2408,36 +2500,37 @@ function renderBattlefield() {
     }
     const isDisciplineViolation = gameState.character.brokenShield;
     const waveCount = gameState.daveLab.waveCount || 3;
-    let html = '';
+    // V10: Panoramic layout — all waves side by side
+    let html = '<div class="battlefield-panorama">';
     for (let w = 1; w <= waveCount; w++) {
         const waveItems = parsed.filter(h => h.wave === w);
         if (!waveItems.length) continue;
         const cleared = gameState.homework.waveCleared[w - 1];
         const waveIcon = w === waveCount ? '👹' : w === 1 ? '🧟' : '🧟‍♂️';
-        const waveName = w === waveCount ? '第' + w + '波 — BOSS 巨人僵尸' : '第' + w + '波 — 僵尸军团';
+        const waveName = w === waveCount ? '第' + w + '波 BOSS' : '第' + w + '波';
+        const mandatoryItems = waveItems.filter(h => h.isMandatory !== false);
+        const mandatoryDone = mandatoryItems.filter(h => h.status === 'completed').length;
         const doneCount = waveItems.filter(h => h.status === 'completed').length;
-        const progressPct = Math.round(doneCount / waveItems.length * 100);
+        const progressPct = mandatoryItems.length > 0 ? Math.round(mandatoryDone / mandatoryItems.length * 100) : 100;
+        html += '<div class="wave-column">';
         html += '<div class="wave-header ' + (cleared ? 'cleared' : '') + '" data-wave="' + w + '" ondragover="hwWaveDragOver(event)" ondrop="hwWaveDrop(event,' + w + ')" ondragleave="hwWaveDragLeave(event)">';
         html += '<h3>' + waveIcon + ' ' + waveName + '</h3>';
         html += '<span class="wave-status">' + doneCount + '/' + waveItems.length + (cleared ? ' ✅' : '') + '</span>';
-        html += '<span style="font-size:0.7em;color:rgba(255,255,255,0.3);margin-left:8px;">拖拽卡片到此波次</span>';
         html += '<div class="wave-progress-wrap"><div class="wave-progress-bar" style="width:' + progressPct + '%"></div></div>';
         html += '</div>';
-        // Check for optional pairs in this wave
         const renderedIds = new Set();
-        html += '<div class="homework-grid">';
+        html += '<div class="homework-grid-panorama">';
         waveItems.forEach(hw => {
             if (renderedIds.has(hw.id)) return;
             const pair = gameState.homework.optionalPairs.find(p => p.ids.includes(hw.id));
             if (pair && !pair.clearedBy) {
-                // Render as choice pair
                 const hw2 = parsed.find(h => h.id === pair.ids.find(id => id !== hw.id));
                 if (hw2 && !renderedIds.has(hw2.id)) {
-                    html += '</div><div class="choice-pair-container">';
+                    html += '<div class="choice-pair-vertical">';
                     html += renderHwCard(hw, isDisciplineViolation, true);
-                    html += '<div class="choice-or">或</div>';
+                    html += '<div class="choice-or-mini">或</div>';
                     html += renderHwCard(hw2, isDisciplineViolation, true);
-                    html += '</div><div class="homework-grid">';
+                    html += '</div>';
                     renderedIds.add(hw.id);
                     renderedIds.add(hw2.id);
                     return;
@@ -2447,25 +2540,37 @@ function renderBattlefield() {
             renderedIds.add(hw.id);
         });
         html += '</div>';
+        html += '</div>';
     }
+    html += '</div>';
     container.innerHTML = html;
 }
 function renderHwCard(hw, isDisciplineViolation, isChoice) {
     const done = hw.status === 'completed';
+    const isMandatory = hw.isMandatory !== false;
     const bossStyle = hw.wave === (gameState.daveLab.waveCount || 3) ? 'border-color:rgba(220,53,69,0.4);' : '';
+    const mandatoryStyle = !done && isMandatory ? 'hw-mandatory' : '';
+    const optionalStyle = !done && !isMandatory ? 'hw-optional' : '';
     const dragAttr = !done ? ' draggable="true" ondragstart="hwDragStart(event,\'' + hw.id + '\')" ondragend="hwDragEnd(event)"' : '';
-    let html = '<div class="hw-card ' + (done ? 'completed undo-pending' : '') + (isChoice ? ' choice-highlight' : '') + '" data-hw-id="' + hw.id + '" data-hw-wave="' + hw.wave + '" style="' + bossStyle + 'display:flex;align-items:stretch;"' + dragAttr + ' ondragover="hwDragOver(event)" ondrop="hwDrop(event,\'' + hw.id + '\')" ondragleave="hwDragLeave(event)">';
+    let html = '<div class="hw-card ' + (done ? 'completed undo-pending' : '') + (isChoice ? ' choice-highlight' : '') + ' ' + mandatoryStyle + ' ' + optionalStyle + '" data-hw-id="' + hw.id + '" data-hw-wave="' + hw.wave + '" style="' + bossStyle + 'display:flex;align-items:stretch;"' + dragAttr + ' ondragover="hwDragOver(event)" ondrop="hwDrop(event,\'' + hw.id + '\')" ondragleave="hwDragLeave(event)">';
     // V8: Delete button
     if (!done) html += '<button class="btn-delete-hw" onclick="event.stopPropagation();deleteHomework(\'' + hw.id + '\')" title="删除此作业">×</button>';
+    // V10: Toggle mandatory button
+    if (!done) html += '<button class="btn-toggle-mandatory" onclick="event.stopPropagation();toggleMandatory(\'' + hw.id + '\')" title="切换必做/选做">' + (isMandatory ? '🔴' : '🟡') + '</button>';
     html += '<div style="flex:1;">';
     html += '<span class="subject-tag subject-' + hw.subjectClass + '" onclick="event.stopPropagation();cycleSubject(\'' + hw.id + '\')" style="cursor:pointer;" title="点击切换科目">' + hw.subject + '</span>';
     if (hw.wave === (gameState.daveLab.waveCount || 3) && !done) html += ' <span style="font-size:0.8em;">💀</span>';
     html += '<div class="hw-desc">' + (done ? '✅ ' : '') + hw.description + '</div>';
     html += '<div class="hw-meta">';
     html += '<div class="hw-meta-tags">';
-    html += hw.required ? '<span class="badge badge-required">必做</span> ' : '<span class="badge badge-optional">选做</span> ';
+    if (isMandatory) {
+        html += '<span class="badge badge-required">必做</span> ';
+    } else {
+        html += '<span class="badge badge-optional">选做 ☀️×2</span> ';
+    }
     const rewardColor = isDisciplineViolation && !done ? 'color:#888' : '';
-    html += '<span class="badge badge-sunshine" style="' + rewardColor + '">☀️' + hw.sunshineReward + (isDisciplineViolation ? '×0.5' : '') + '</span>';
+    const displayReward = !isMandatory ? hw.sunshineReward * 2 : hw.sunshineReward;
+    html += '<span class="badge badge-sunshine" style="' + rewardColor + '">☀️' + displayReward + (isDisciplineViolation ? '×0.5' : '') + '</span>';
     if (hw.pageNum) html += ' <span class="badge" style="background:rgba(255,255,255,0.05);color:#666">p.' + hw.pageNum + '</span>';
     html += '</div></div></div>';
     // Right side: kill button, undo hint, or done indicator
@@ -3350,7 +3455,24 @@ function renderDaveLab() {
     remind += '<input type="text" id="adHocReminderInput" placeholder="输入提醒内容..." style="flex:1;min-width:200px;padding:10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:10px;color:#fff;font-size:1em;">';
     remind += '<button class="btn btn-sunshine btn-sm" onclick="sendAdHocReminder()">📢 发送提醒</button>';
     remind += '</div>';
-    remind += '<p style="color:#888;font-size:0.85em;margin-top:8px;">提醒会以趣味弹窗+语音方式呈现给孩子。开启云同步后，提醒会自动推送到孩子的设备（约30秒延迟）</p>';
+    remind += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;">';
+    remind += '<input type="text" id="emergencyReminderInput" placeholder="紧急指令内容（全屏强插）..." style="flex:1;min-width:200px;padding:10px;background:rgba(220,53,69,0.1);border:1px solid rgba(220,53,69,0.4);border-radius:10px;color:#ff8a8a;font-size:1em;">';
+    remind += '<button class="btn btn-danger btn-sm" onclick="sendEmergencyReminder()">🚨 紧急指令</button>';
+    remind += '</div>';
+    remind += '<p style="color:#888;font-size:0.85em;margin-top:8px;">普通提醒以趣味弹窗呈现。紧急指令会中断当前界面，全屏弹出史迪奇气泡并强制语音播报。</p>';
+    // Peak hours config
+    const ph = gameState.daveLab.peakHours || { enabled: false, start: '16:00', end: '21:00' };
+    remind += '<div style="margin-top:12px;padding:12px;background:rgba(255,165,0,0.08);border:1px solid rgba(255,165,0,0.2);border-radius:10px;">';
+    remind += '<label style="display:flex;align-items:center;gap:10px;cursor:pointer;">';
+    remind += '<input type="checkbox" ' + (ph.enabled ? 'checked' : '') + ' onchange="gameState.daveLab.peakHours.enabled=this.checked;saveGame();" style="width:18px;height:18px;">';
+    remind += '<span style="color:#ffc97d;font-weight:bold;">⚡ 高峰时段模式</span></label>';
+    remind += '<div style="display:flex;gap:10px;align-items:center;margin-top:8px;">';
+    remind += '<input type="time" value="' + (ph.start || '16:00') + '" onchange="gameState.daveLab.peakHours.start=this.value;saveGame();" style="padding:6px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;">';
+    remind += '<span style="color:#aaa;">至</span>';
+    remind += '<input type="time" value="' + (ph.end || '21:00') + '" onchange="gameState.daveLab.peakHours.end=this.value;saveGame();" style="padding:6px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.2);border-radius:8px;color:#fff;">';
+    remind += '</div>';
+    remind += '<p style="color:#888;font-size:0.8em;margin-top:6px;">高峰时段内同步频率提升至每20秒一次（默认30秒）</p>';
+    remind += '</div>';
     const pending = (gameState.daveLab.pendingReminders || []).filter(r => !r.consumed);
     if (pending.length > 0) {
         remind += '<div style="margin-top:10px;padding:8px;background:rgba(255,215,0,0.1);border-radius:10px;border:1px solid rgba(255,215,0,0.2);">';
@@ -3429,7 +3551,12 @@ function renderDaveLab() {
     backup += '<p style="color:#888;font-size:0.85em;margin-top:10px;">可复制JSON到微信收藏夹作为手动备份</p>';
     html += labSection('backup', '💾', '数据备份与恢复', backup);
     // 11. 数据清零与重置
-    let reset = '<p style="color:#ff6b6b;font-size:0.9em;margin-bottom:12px;">⚠️ 以下操作不可撤销，请谨慎使用！建议先备份数据。</p>';
+    let reset = '<div style="margin-bottom:14px;padding:14px;background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.3);border-radius:12px;">';
+    reset += '<div style="font-weight:bold;color:#ffc97d;margin-bottom:8px;">🔄 全军重启 — 重置今日所有任务状态</div>';
+    reset += '<p style="color:#aaa;font-size:0.85em;margin-bottom:10px;">将今天所有Daily作业和常规任务的完成状态重置为未完成，不影响经济数据和历史记录。</p>';
+    reset += '<button class="btn btn-sunshine btn-sm" onclick="forceResetDailyTasks()">🔄 全军重启</button>';
+    reset += '</div>';
+    reset += '<p style="color:#ff6b6b;font-size:0.9em;margin-bottom:12px;">⚠️ 以下操作不可撤销，请谨慎使用！建议先备份数据。</p>';
     reset += '<div style="display:flex;flex-direction:column;gap:10px;">';
     // Selective reset options
     reset += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
@@ -3513,7 +3640,11 @@ function consumePendingReminders() {
         if (!r.consumed) {
             r.consumed = true;
             changed = true;
-            showReminderPopup(r.message);
+            if (r.emergency) {
+                showEmergencyPopup(r.message);
+            } else {
+                showReminderPopup(r.message);
+            }
         }
     });
     if (changed) saveGame();
@@ -3545,6 +3676,66 @@ async function pollRemoteReminders() {
         if (hasNew) consumePendingReminders();
     } catch(e) {}
 }
+function isInPeakHours() {
+    const ph = gameState.daveLab.peakHours;
+    if (!ph || !ph.enabled) return false;
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const [sH, sM] = (ph.start || '16:00').split(':').map(Number);
+    const [eH, eM] = (ph.end || '21:00').split(':').map(Number);
+    const startMin = sH * 60 + sM;
+    const endMin = eH * 60 + eM;
+    if (startMin <= endMin) return nowMin >= startMin && nowMin <= endMin;
+    return nowMin >= startMin || nowMin <= endMin;
+}
+let _pollTimer = null;
+let _lastPollIsPeak = null;
+function startDynamicPolling() {
+    function schedulePoll() {
+        const peak = isInPeakHours();
+        const interval = peak ? 20000 : 30000;
+        if (_pollTimer && _lastPollIsPeak === peak) return;
+        if (_pollTimer) clearInterval(_pollTimer);
+        _lastPollIsPeak = peak;
+        _pollTimer = setInterval(pollRemoteReminders, interval);
+    }
+    schedulePoll();
+    setInterval(schedulePoll, 60000);
+}
+function showEmergencyPopup(message) {
+    const existing = document.getElementById('emergencyPopup');
+    if (existing) existing.remove();
+    const popup = document.createElement('div');
+    popup.id = 'emergencyPopup';
+    popup.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.92);z-index:9800;display:flex;align-items:center;justify-content:center;flex-direction:column;';
+    popup.innerHTML = '<div style="text-align:center;max-width:500px;padding:40px;">' +
+        '<div style="font-size:6em;animation:reminderBounce 0.8s ease infinite;">👽</div>' +
+        '<div style="font-size:1.8em;font-weight:bold;color:#ff6b6b;margin:20px 0;text-shadow:0 0 20px rgba(255,107,107,0.5);animation:mandatoryPulse 1.5s ease infinite;">🚨 紧急指令 🚨</div>' +
+        '<div style="font-size:1.4em;line-height:1.8;color:#fff;margin-bottom:30px;padding:20px;background:rgba(220,53,69,0.15);border:2px solid rgba(220,53,69,0.4);border-radius:20px;">' + message + '</div>' +
+        '<div style="color:#aaa;font-size:0.9em;margin-bottom:16px;">这是死命令，指挥官！</div>' +
+        '<button class="btn btn-sunshine" onclick="this.closest(\'#emergencyPopup\').remove();" style="padding:16px 40px;font-size:1.2em;">✅ 收到！</button>' +
+        '</div>';
+    document.body.appendChild(popup);
+    azureTTS.speak('紧急指令！' + message);
+}
+function sendEmergencyReminder() {
+    const input = document.getElementById('emergencyReminderInput');
+    const msg = input.value.trim();
+    if (!msg) { showToast('请输入紧急提醒内容'); return; }
+    input.value = '';
+    if (!gameState.daveLab.pendingReminders) gameState.daveLab.pendingReminders = [];
+    gameState.daveLab.pendingReminders.push({
+        id: 'rem_' + Date.now(), message: msg, createdAt: new Date().toISOString(), consumed: false, emergency: true
+    });
+    saveGame();
+    showEmergencyPopup(msg);
+    if (getGistToken() && gameState.daveLab.githubGistId) {
+        syncToGist();
+        showToast('紧急指令已发送并同步！孩子设备将在20秒内收到');
+    } else {
+        showToast('紧急指令已发送（本地）');
+    }
+}
 function copyGameDataToClipboard() {
     const data = JSON.stringify(gameState, null, 2);
     navigator.clipboard.writeText(data).then(() => {
@@ -3572,6 +3763,17 @@ function pasteGameDataFromClipboard() {
     } catch(err) { showToast('恢复失败: ' + err.message); }
 }
 // ==================== RESET & MANUAL VALUES ====================
+function forceResetDailyTasks() {
+    if (!confirm('确定要重置今天所有任务状态吗？作业和常规任务都会变回未完成。')) return;
+    gameState.homework.parsed.forEach(hw => { hw.status = 'pending'; hw.completedAt = null; });
+    gameState.homework.waveCleared = new Array(gameState.daveLab.waveCount || 3).fill(false);
+    gameState.homework.bossUnlocked = false;
+    gameState.homework.optionalPairs.forEach(p => { p.clearedBy = null; });
+    gameState.homework.optionalChoices = {};
+    gameState.routines.tasks.forEach(t => { t.completed = false; t.completedAt = null; });
+    saveGame(); renderAll(); renderDaveLab();
+    showToast('全军重启完成！所有任务已重置');
+}
 function resetSection(section) {
     const names = { homework: '今日作业', routines: '任务完成状态', economy: '经济数据', garden: '花园植物', achievements: '成就与等级', history: '历史记录' };
     if (!confirm('确定要清零「' + names[section] + '」吗？此操作不可撤销！')) return;
@@ -4622,8 +4824,8 @@ function startApp() {
     }, 600000);
     // Task time reminders
     initTaskReminders();
-    // Cross-device reminder polling (every 30s)
-    setInterval(pollRemoteReminders, 30000);
+    // Cross-device reminder polling (dynamic: 20s peak, 30s normal)
+    startDynamicPolling();
     // Welcome motivational voice broadcast
     const welcomeLine = getDaveLine('welcome');
     showToast(welcomeLine);
