@@ -184,6 +184,12 @@ body::before {
     box-shadow: 0 0 25px rgba(255,215,0,0.35), 0 8px 24px rgba(0,0,0,0.2) !important;
 }
 .routine-card.off-slot { opacity: 0.45; transform: scale(0.88); filter: brightness(0.8); }
+/* V10: Overdue task — past time but not completed */
+.routine-card.overdue-slot {
+    opacity: 0.85; border-color: rgba(220,53,69,0.5) !important;
+    background: rgba(220,53,69,0.08) !important;
+    box-shadow: 0 0 12px rgba(220,53,69,0.2);
+}
 .routine-card.dragging {
     opacity: 0.5; transform: scale(0.9) rotate(-3deg) !important;
     box-shadow: 0 15px 40px rgba(0,0,0,0.4) !important; z-index: 100;
@@ -1322,6 +1328,19 @@ function loadGame() {
             if (!saved) { migrateFromV3(); return; }
         }
         let parsed = JSON.parse(saved);
+        // V10: Auto-backup before any migration — keep last 3 backups
+        const oldVer = parsed.schemaVersion || parsed.version || 7;
+        if (oldVer < DEFAULT_STATE.schemaVersion) {
+            localStorage.setItem('xiaoshuPVZ_backup_v' + oldVer, saved);
+            const backupKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('xiaoshuPVZ_backup_v')) backupKeys.push(k);
+            }
+            backupKeys.sort();
+            while (backupKeys.length > 3) localStorage.removeItem(backupKeys.shift());
+            console.log('已自动备份 V' + oldVer + ' 数据');
+        }
         if (parsed.daveLab && parsed.daveLab.githubGistToken) {
             setGistToken(parsed.daveLab.githubGistToken);
             delete parsed.daveLab.githubGistToken;
@@ -1332,8 +1351,9 @@ function loadGame() {
         }
         parsed = runMigrations(parsed);
         gameState = deepMerge(JSON.parse(JSON.stringify(DEFAULT_STATE)), parsed);
+        // V10: Always save after load to persist migration results
+        saveGame();
         if (needsKeyMigration) {
-            saveGame();
             ['xiaoshuPVZv8','xiaoshuPVZv7','xiaoshuPVZv6','xiaoshuPVZv5'].forEach(k => localStorage.removeItem(k));
             console.log('已迁移到统一存储 key: xiaoshuPVZ');
         }
@@ -2632,14 +2652,26 @@ function renderRoutines() {
     }
     // Carousel of task cards — completed tasks auto-sort to end
     const sortedTasks = [...gameState.routines.tasks].sort((a, b) => {
-        // Completed tasks go to the end
         if (a.completed && !b.completed) return 1;
         if (!a.completed && b.completed) return -1;
-        // Among same status, sort by order
         return (a.order || 0) - (b.order || 0);
     });
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
+    // V10: Find the "next undone task" — first uncompleted task whose time <= now, or the nearest future one
+    let nextTaskId = null;
+    const undoneTasks = gameState.routines.tasks.filter(t => !t.completed).sort((a, b) => {
+        const [aH, aM] = (a._adjTime || a.time).split(':').map(Number);
+        const [bH, bM] = (b._adjTime || b.time).split(':').map(Number);
+        return (aH * 60 + aM) - (bH * 60 + bM);
+    });
+    if (undoneTasks.length > 0) {
+        const overdueOrCurrent = undoneTasks.filter(t => {
+            const [h, m] = (t._adjTime || t.time).split(':').map(Number);
+            return h * 60 + m <= nowMin;
+        });
+        nextTaskId = overdueOrCurrent.length > 0 ? overdueOrCurrent[overdueOrCurrent.length - 1].id : undoneTasks[0].id;
+    }
     html += '<div class="routine-carousel-wrap">';
     html += '<div class="routine-carousel" id="routineCarousel">';
     sortedTasks.forEach((task, idx) => {
@@ -2651,10 +2683,10 @@ function renderRoutines() {
         const [tH, tM] = displayTime.split(':').map(Number);
         const taskMin = tH * 60 + tM;
         const dur = displayDur;
-        const isCurrent = !done && nowMin >= taskMin - 5 && nowMin <= taskMin + dur + 10;
-        const isPast = nowMin > taskMin + dur + 10;
-        const isFuture = nowMin < taskMin - 5;
-        const slotClass = done ? 'completed' : isCurrent ? 'current-slot' : (isPast || isFuture) ? 'off-slot' : '';
+        const isNext = !done && task.id === nextTaskId;
+        const isOverdue = !done && !isNext && nowMin > taskMin + dur;
+        const isFuture = !done && !isNext && nowMin < taskMin;
+        const slotClass = done ? 'completed' : isNext ? 'current-slot' : isOverdue ? 'overdue-slot' : isFuture ? 'off-slot' : 'off-slot';
         html += '<div class="routine-card ' + slotClass + '" data-task-id="' + task.id + '" id="rcard_' + task.id + '">';
         html += '<div class="routine-header">';
         html += '<span class="routine-icon">' + routineEmoji + '</span>';
@@ -2673,6 +2705,12 @@ function renderRoutines() {
         if (done) {
             html += '<div style="color:var(--pvz-green-light);font-size:1.5em;">✅</div>';
             html += '<div style="font-size:0.65em;color:#aaa;cursor:pointer;" onclick="event.stopPropagation();undoRoutine(\'' + task.id + '\')">点此撤销</div>';
+        } else if (isNext) {
+            html += '<button class="btn btn-sunshine btn-sm" onclick="event.stopPropagation();completeRoutine(\'' + task.id + '\')" style="margin-top:4px;padding:8px 16px;">✅ 完成</button>';
+            html += '<div class="drag-hint">或拖到能量桶</div>';
+        } else if (isOverdue) {
+            html += '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();completeRoutine(\'' + task.id + '\')" style="margin-top:4px;padding:6px 12px;font-size:0.8em;">⚠️ 补完成</button>';
+            html += '<div class="drag-hint">已超时</div>';
         } else {
             html += '<div class="drag-hint">⬆ 长按拖到能量桶</div>';
         }
@@ -3549,6 +3587,34 @@ function renderDaveLab() {
     backup += '<input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importGameData(event)">';
     backup += '</div>';
     backup += '<p style="color:#888;font-size:0.85em;margin-top:10px;">可复制JSON到微信收藏夹作为手动备份</p>';
+    // V10: Auto-backup recovery
+    const autoBackups = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('xiaoshuPVZ_backup_v')) autoBackups.push(k);
+    }
+    if (autoBackups.length > 0) {
+        autoBackups.sort().reverse();
+        backup += '<div style="margin-top:12px;padding:12px;background:rgba(79,195,247,0.08);border:1px solid rgba(79,195,247,0.2);border-radius:10px;">';
+        backup += '<div style="font-size:0.9em;color:#4fc3f7;font-weight:bold;margin-bottom:8px;">🛡️ 版本升级自动备份</div>';
+        backup += '<p style="color:#888;font-size:0.8em;margin-bottom:8px;">每次版本升级时自动保存的数据快照，可用于恢复丢失的数据</p>';
+        autoBackups.forEach(k => {
+            const ver = k.replace('xiaoshuPVZ_backup_v', '');
+            let info = '';
+            try {
+                const d = JSON.parse(localStorage.getItem(k));
+                const tasks = (d.routines && d.routines.tasks) ? d.routines.tasks.length : 0;
+                const sun = (d.economy && d.economy.sunshine) || 0;
+                const hw = (d.homework && d.homework.parsed) ? d.homework.parsed.length : 0;
+                info = ' (任务' + tasks + '个, 阳光' + sun + ', 作业' + hw + '条)';
+            } catch(e) {}
+            backup += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">';
+            backup += '<span style="color:#ccc;font-size:0.85em;">V' + ver + ' 备份' + info + '</span>';
+            backup += '<button class="btn btn-ice btn-sm" onclick="restoreAutoBackup(\'' + k + '\')" style="padding:4px 10px;font-size:0.8em;">恢复</button>';
+            backup += '</div>';
+        });
+        backup += '</div>';
+    }
     html += labSection('backup', '💾', '数据备份与恢复', backup);
     // 11. 数据清零与重置
     let reset = '<div style="margin-bottom:14px;padding:14px;background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.3);border-radius:12px;">';
@@ -3761,6 +3827,49 @@ function pasteGameDataFromClipboard() {
         showToast('数据恢复成功！');
         closeDaveLab();
     } catch(err) { showToast('恢复失败: ' + err.message); }
+}
+function restoreAutoBackup(backupKey) {
+    const data = localStorage.getItem(backupKey);
+    if (!data) { showToast('备份数据不存在'); return; }
+    if (!confirm('确定要从此备份恢复吗？当前数据将被覆盖。')) return;
+    try {
+        let parsed = JSON.parse(data);
+        parsed = runMigrations(parsed);
+        gameState = deepMerge(JSON.parse(JSON.stringify(DEFAULT_STATE)), parsed);
+        saveGame(); renderAll();
+        showToast('已从备份恢复成功！');
+        closeDaveLab();
+    } catch(err) { showToast('恢复失败: ' + err.message); }
+}
+function checkDataRecovery() {
+    const hasRoutineData = gameState.routines.tasks.some(t => t.name !== DEFAULT_STATE.routines.tasks.find(d => d.id === t.id)?.name);
+    const hasSunshine = gameState.economy.sunshine > 0;
+    const hasHistory = gameState.history.dailyLogs.length > 0;
+    const hasPlants = gameState.garden.plants.length > 0;
+    const hasData = hasRoutineData || hasSunshine || hasHistory || hasPlants;
+    if (hasData) return;
+    const backupKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('xiaoshuPVZ_backup_v')) backupKeys.push(k);
+    }
+    if (backupKeys.length === 0) return;
+    backupKeys.sort().reverse();
+    const bestKey = backupKeys[0];
+    try {
+        const d = JSON.parse(localStorage.getItem(bestKey));
+        const sun = (d.economy && d.economy.sunshine) || 0;
+        const logs = (d.history && d.history.dailyLogs) ? d.history.dailyLogs.length : 0;
+        const plants = (d.garden && d.garden.plants) ? d.garden.plants.length : 0;
+        if (sun === 0 && logs === 0 && plants === 0) return;
+        const ver = bestKey.replace('xiaoshuPVZ_backup_v', '');
+        setTimeout(() => {
+            showModal('🛡️', '检测到历史数据', '当前存档看起来是空的，但发现了 V' + ver + ' 的自动备份：<br>阳光 ' + sun + ' | 历史记录 ' + logs + '天 | 植物 ' + plants + '棵<br><br>是否恢复？', [
+                { text: '恢复数据', cls: 'btn-sunshine', action: 'restoreAutoBackup(\'' + bestKey + '\');closeModal()' },
+                { text: '不用了', cls: 'btn-primary', action: 'closeModal()' }
+            ]);
+        }, 500);
+    } catch(e) {}
 }
 // ==================== RESET & MANUAL VALUES ====================
 function forceResetDailyTasks() {
@@ -4784,6 +4893,8 @@ function startApp() {
     audioQueue.init();
     loadGame();
     dailyReset();
+    // V10: Detect empty data with available backups — prompt recovery
+    checkDataRecovery();
     renderAll();
     updateClock();
     // V8: Auto-sync pull on init
