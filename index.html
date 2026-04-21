@@ -1512,6 +1512,17 @@ function dailyReset() {
     gameState.economy.bank.interestShownToday = false;
     // 重置每日状态
     gameState.routines.tasks.forEach(t => { t.completed = false; t.completedAt = null; });
+    // Clear all reminder tracking for fresh day
+    _remindedTasks.clear();
+    _preRemindedTasks.clear();
+    Object.keys(reminderNagTimers).forEach(k => {
+        if (reminderNagTimers[k].timer) clearTimeout(reminderNagTimers[k].timer);
+        delete reminderNagTimers[k];
+    });
+    Object.keys(_followUpTimers).forEach(k => {
+        clearTimeout(_followUpTimers[k]);
+        delete _followUpTimers[k];
+    });
     gameState.homework = { rawText: '', parsed: [], currentWave: 1, waveCleared: new Array(gameState.daveLab.waveCount || 3).fill(false), bossUnlocked: false, optionalPairs: [] };
     gameState.character.disciplineToday = null;
     gameState.character.calmMedalToday = false;
@@ -3880,8 +3891,13 @@ function forceResetDailyTasks() {
     gameState.homework.optionalPairs.forEach(p => { p.clearedBy = null; });
     gameState.homework.optionalChoices = {};
     gameState.routines.tasks.forEach(t => { t.completed = false; t.completedAt = null; });
+    // Clear reminder tracking
+    _remindedTasks.clear();
+    _preRemindedTasks.clear();
+    Object.keys(reminderNagTimers).forEach(k => { if (reminderNagTimers[k].timer) clearTimeout(reminderNagTimers[k].timer); delete reminderNagTimers[k]; });
+    Object.keys(_followUpTimers).forEach(k => { clearTimeout(_followUpTimers[k]); delete _followUpTimers[k]; });
     saveGame(); renderAll(); renderDaveLab();
-    showToast('全军重启完成！所有任务已重置');
+    showToast('全军重启完成！所有任务已重置，提醒系统已刷新');
 }
 function resetSection(section) {
     const names = { homework: '今日作业', routines: '任务完成状态', economy: '经济数据', garden: '花园植物', achievements: '成就与等级', history: '历史记录' };
@@ -4168,6 +4184,9 @@ function completeRoutine(taskId) {
     if (!task || task.completed) return;
     task.completed = true;
     task.completedAt = new Date().toISOString();
+    // Clear follow-up timer for this task
+    if (_followUpTimers[taskId]) { clearTimeout(_followUpTimers[taskId]); delete _followUpTimers[taskId]; }
+    if (reminderNagTimers[taskId]) { clearTimeout(reminderNagTimers[taskId].timer); delete reminderNagTimers[taskId]; }
     addFertilizer(task.fertilizerType, task.fertilizerWeight);
     addCoins(task.coinReward);
     gameState.history.totalPoints += task.coinReward;
@@ -4787,6 +4806,51 @@ SpeechContext.prototype._handleResult = function(event) {
 // ==================== REMINDER_SYSTEM ====================
 let activeReminder = null;
 let reminderNagTimers = {}; // taskId -> { timer, count }
+let _remindedTasks = new Set(); // tasks already reminded this cycle (cleared on daily reset)
+let _preRemindedTasks = new Set(); // tasks already pre-reminded (1 min before)
+let _followUpTimers = {}; // taskId -> setTimeout id for 2-min auto follow-up
+
+function showPreReminderPopup(message, taskId) {
+    const popup = document.getElementById('reminderPopup');
+    const style = gameState.voice.voiceStyle || 'stitch';
+    const iconMap = { stitch: '👽', warrior: '🔥', frost: '❄️' };
+    document.getElementById('reminderIcon').textContent = iconMap[style] || '🌻';
+    let wfEl = document.getElementById('ttsWaveform');
+    if (!wfEl) { wfEl = createWaveformElement(); }
+    document.getElementById('reminderIcon').parentNode.insertBefore(wfEl, document.getElementById('reminderIcon').nextSibling);
+    document.getElementById('reminderText').textContent = message;
+    let actions = '<button class="btn btn-sunshine btn-sm" onclick="dismissPreReminder()">👌 知道了</button>';
+    document.getElementById('reminderActions').innerHTML = actions;
+    document.getElementById('voiceIndicator').textContent = '';
+    popup.style.display = 'flex';
+    azureTTS.speak(message);
+    // Auto-dismiss after 15 seconds
+    setTimeout(() => {
+        if (popup.style.display === 'flex' && !activeReminder) {
+            popup.style.display = 'none';
+        }
+    }, 15000);
+}
+function dismissPreReminder() {
+    azureTTS.stop();
+    document.getElementById('reminderPopup').style.display = 'none';
+    showToast('好的，1分钟后正式开始哦！');
+}
+function startFollowUpTimer(taskId, taskName, taskIcon) {
+    if (_followUpTimers[taskId]) clearTimeout(_followUpTimers[taskId]);
+    _followUpTimers[taskId] = setTimeout(() => {
+        const task = gameState.routines.tasks.find(t => t.id === taskId);
+        if (!task || task.completed) { delete _followUpTimers[taskId]; return; }
+        const msg = taskIcon + ' 「' + taskName + '」还没完成吗？还需要几分钟？说"完成"或者告诉我还要几分钟！';
+        if (document.visibilityState === 'visible') {
+            showReminderPopup(msg, taskId);
+        } else {
+            showPersistentNotification(msg, taskId);
+            playBackgroundAlarm();
+        }
+        delete _followUpTimers[taskId];
+    }, 120000); // 2 minutes
+}
 
 function showReminderPopup(message, taskId) {
     activeReminder = { message, taskId, snoozeCount: 0 };
@@ -4951,24 +5015,53 @@ function startApp() {
     }, 1500);
 }
 function initTaskReminders() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') Notification.requestPermission();
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
     requestWakeLock();
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
+            dailyReset();
+            renderAll();
             checkMissedReminders();
             requestWakeLock();
-            renderRoutines();
         }
+    });
+    window.addEventListener('pageshow', () => {
+        dailyReset();
+        renderAll();
+        checkMissedReminders();
+    });
+    window.addEventListener('focus', () => {
+        dailyReset();
+        renderAll();
+        checkMissedReminders();
     });
     setInterval(() => {
         recalculateCompressedTimes();
         const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
         const hhmm = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
         gameState.routines.tasks.forEach(task => {
             if (task.completed) return;
             const checkTime = task._adjTime || task.time;
-            if (checkTime === hhmm) {
+            const [tH, tM] = checkTime.split(':').map(Number);
+            const taskMin = tH * 60 + tM;
+            const preMin = taskMin - 1;
+            const preHH = String(Math.floor((preMin + 1440) % 1440 / 60)).padStart(2,'0');
+            const preMM = String((preMin + 1440) % 1440 % 60).padStart(2,'0');
+            const preHHMM = preHH + ':' + preMM;
+            // Pre-reminder: 1 minute before task time
+            if (hhmm === preHHMM && !_preRemindedTasks.has(task.id) && !_remindedTasks.has(task.id)) {
+                _preRemindedTasks.add(task.id);
+                const msg = '⏳ 1分钟后要做「' + task.name + '」了，' + task.icon + ' 准备好哦！';
+                if (document.visibilityState === 'visible') {
+                    showPreReminderPopup(msg, task.id);
+                } else {
+                    showPersistentNotification(msg, task.id);
+                }
+            }
+            // On-time reminder: exact task time
+            if (nowMin === taskMin && !_remindedTasks.has(task.id)) {
+                _remindedTasks.add(task.id);
                 const msg = task.icon + ' 该做「' + task.name + '」啦！完成可获得化肥和金币哦！';
                 if (document.visibilityState === 'visible') {
                     showReminderPopup(msg, task.id);
@@ -4976,16 +5069,20 @@ function initTaskReminders() {
                     showPersistentNotification(msg, task.id);
                     playBackgroundAlarm();
                 }
+                // Start 2-min follow-up timer
+                startFollowUpTimer(task.id, task.name, task.icon);
             }
         });
+        // Departure deadline warning
         const deadline = gameState.routines.departureDeadline || '08:00';
         const [dH, dM] = deadline.split(':').map(Number);
-        const deadlineWarnHour = dM - 10 >= 0 ? dH : dH - 1;
-        const warnHHMM = String(deadlineWarnHour).padStart(2,'0') + ':' + String((dM - 10 + 60) % 60).padStart(2,'0');
-        if (hhmm === warnHHMM) {
+        const deadlineMin = dH * 60 + dM;
+        const warnMin = deadlineMin - 10;
+        if (nowMin === warnMin && !_remindedTasks.has('departure_warn')) {
+            _remindedTasks.add('departure_warn');
             const unfinished = gameState.routines.tasks.filter(t => {
                 const [h, m] = t.time.split(':').map(Number);
-                return !t.completed && h * 60 + m <= dH * 60 + dM;
+                return !t.completed && h * 60 + m <= deadlineMin;
             });
             if (unfinished.length > 0) {
                 const msg = '⚠️ 还有10分钟就要出门了！还有 ' + unfinished.length + ' 个任务没完成！';
@@ -4997,7 +5094,7 @@ function initTaskReminders() {
                 }
             }
         }
-    }, 60000);
+    }, 30000);
 }
 let _wakeLock = null;
 async function requestWakeLock() {
@@ -5005,12 +5102,28 @@ async function requestWakeLock() {
     try { _wakeLock = await navigator.wakeLock.request('screen'); _wakeLock.addEventListener('release', () => { _wakeLock = null; }); } catch(e) {}
 }
 function showPersistentNotification(msg, taskId) {
-    if (Notification.permission !== 'granted') return;
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
     try {
-        new Notification('🌻 PVZ Quest 提醒', {
-            body: msg, tag: 'routine_' + (taskId || 'general'),
-            requireInteraction: true
+        const n = new Notification('🌻 PVZ Quest 提醒', {
+            body: msg,
+            tag: 'routine_' + (taskId || 'general'),
+            requireInteraction: true,
+            renotify: true,
+            vibrate: [200, 100, 200, 100, 300],
+            silent: false
         });
+        n.onclick = () => {
+            window.focus();
+            n.close();
+            if (taskId && taskId !== 'departure' && taskId !== 'general') {
+                const task = gameState.routines.tasks.find(t => t.id === taskId);
+                if (task && !task.completed) {
+                    const rmsg = task.icon + ' 该做「' + task.name + '」啦！完成可获得化肥和金币哦！';
+                    showReminderPopup(rmsg, taskId);
+                }
+            }
+            checkMissedReminders();
+        };
     } catch(e) {}
 }
 function playBackgroundAlarm() {
@@ -5037,16 +5150,42 @@ function playBackgroundAlarm() {
 function checkMissedReminders() {
     const now = new Date();
     const nowMin = now.getHours() * 60 + now.getMinutes();
+    const overdue = [];
+    let firstOverdueShown = false;
     gameState.routines.tasks.forEach(task => {
         if (task.completed) return;
         const timeStr = task._adjTime || task.time;
         const [h, m] = timeStr.split(':').map(Number);
         const taskMin = h * 60 + m;
-        if (nowMin >= taskMin && nowMin <= taskMin + 10) {
-            const msg = task.icon + ' 该做「' + task.name + '」啦！完成可获得化肥和金币哦！';
-            showReminderPopup(msg, task.id);
+        if (nowMin >= taskMin && nowMin <= taskMin + (task.duration || 10)) {
+            // Currently in progress window — show reminder if not already reminded
+            if (!_remindedTasks.has(task.id)) {
+                _remindedTasks.add(task.id);
+                const msg = task.icon + ' 该做「' + task.name + '」啦！完成可获得化肥和金币哦！';
+                if (!firstOverdueShown) {
+                    showReminderPopup(msg, task.id);
+                    startFollowUpTimer(task.id, task.name, task.icon);
+                    firstOverdueShown = true;
+                }
+            }
+        } else if (nowMin > taskMin + (task.duration || 10)) {
+            overdue.push(task);
         }
     });
+    // Show popup for the first overdue task that hasn't been reminded yet
+    if (!firstOverdueShown && overdue.length > 0) {
+        const first = overdue[0];
+        if (!_remindedTasks.has('overdue_' + first.id)) {
+            _remindedTasks.add('overdue_' + first.id);
+            const msg = '⚠️ 「' + first.name + '」' + first.icon + ' 已经超时了！赶紧补完成吧！';
+            showReminderPopup(msg, first.id);
+            firstOverdueShown = true;
+        }
+    }
+    if (overdue.length > 0 && !firstOverdueShown) {
+        const names = overdue.map(t => t.icon + t.name).join('、');
+        showToast('⏰ 有 ' + overdue.length + ' 个任务已过时间还没完成：' + names);
+    }
 }
 function updateClock() {
     const now = new Date();
