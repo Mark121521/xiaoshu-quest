@@ -1,0 +1,15 @@
+{
+  "name": "PVZ Quest - 小树教育系统",
+  "short_name": "PVZ Quest",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#2d6b2d",
+  "theme_color": "#4a7c2e",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌻</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
